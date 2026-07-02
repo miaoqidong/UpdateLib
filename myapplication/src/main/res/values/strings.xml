@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">秒启动</string>
+    <string name="app_name_dev">秒启动(dev)</string>
+</resources>

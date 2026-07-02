@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose Activity 用 -->
+    <style name="Theme.SideGesture" parent="@android:style/Theme.Material.Light.NoActionBar" />
+    <!-- 传统 View Activity 用 -->
+    <style name="Theme.SideGesture.View" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>
