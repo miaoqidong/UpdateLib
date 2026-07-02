@@ -10,7 +10,6 @@ android {
 
     defaultConfig {
         minSdk = rootProject.extra["minSdkVersion"] as Int
-        targetSdk = rootProject.extra["compileSdkVersion"] as Int
         consumerProguardFiles("consumer-rules.pro")
     }
 
@@ -46,6 +45,11 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
         }
     }
 }
