@@ -17,6 +17,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.mqd.updatejava.R;
 import com.mqd.updatejava.core.FallbackChecker;
 import com.mqd.updatejava.core.UpdateChecker;
 import com.mqd.updatejava.core.UpdateRepository;
@@ -33,130 +34,69 @@ public class UpdateDialogHelper {
 
     private UpdateDialogHelper() {}
 
-    // ──────────────── 资源 ID 动态获取 ────────────────
-
-    private static int getLayoutId(Context ctx, String name) {
-        return ctx.getResources().getIdentifier(name, "layout", ctx.getPackageName());
-    }
-
-    private static int getId(Context ctx, String name) {
-        return ctx.getResources().getIdentifier(name, "id", ctx.getPackageName());
-    }
-
-    private static int getStringId(Context ctx, String name) {
-        return ctx.getResources().getIdentifier(name, "string", ctx.getPackageName());
-    }
-
-    private static String getStr(Context ctx, String name) {
-        int id = getStringId(ctx, name);
-        return id != 0 ? ctx.getString(id) : name;
-    }
-
-    // ──────────────── 标题构建 ────────────────
-
-    private static View buildCustomTitleView(Context context, int titleRes) {
-        int layoutId = getLayoutId(context, "updatelib_dialog_title_with_link");
-        View titleView = LayoutInflater.from(context).inflate(layoutId, null);
-        TextView tv = titleView.findViewById(getId(context, "tv_dialog_title"));
-        if (tv != null) tv.setText(titleRes);
-        LinearLayout btn = titleView.findViewById(getId(context, "btn_open_link"));
-        if (btn != null) {
-            btn.setOnClickListener(v -> openReleasesPage(context));
-        }
-        return titleView;
-    }
-
     // ──────────────── 公开方法 ────────────────
 
     public static void openReleasesPage(Context context) {
         try {
-            String url = "https://github.com";
-            if (com.mqd.updatejava.core.UpdateLibContext.isInitialized()) {
-                // Try to get releases URL from UpdateChecker
-                url = UpdateChecker.RELEASES_PAGE_URL;
-            }
-            context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            context.startActivity(new Intent(Intent.ACTION_VIEW,
+                    Uri.parse(UpdateChecker.RELEASES_PAGE_URL)));
         } catch (Exception ignored) {
         }
     }
 
     public static AlertDialog showAlreadyLatestDialog(Context context) {
-        int titleId = getStringId(context, "updatelib_update_already_latest_title");
-        int confirmId = getStringId(context, "updatelib_confirm");
         return new AlertDialog.Builder(context)
-                .setCustomTitle(buildCustomTitleView(context,
-                        titleId != 0 ? titleId : android.R.string.ok))
-                .setPositiveButton(confirmId != 0 ? confirmId : android.R.string.ok,
-                        (d, w) -> d.dismiss())
+                .setTitle(R.string.updatelib_update_already_latest_title)
+                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> d.dismiss())
                 .show();
     }
 
     public static AlertDialog showCheckFailedDialog(Context context, Runnable onConfirm) {
-        int titleId = getStringId(context, "updatelib_update_check_failed_title");
-        int msgId = getStringId(context, "updatelib_update_check_failed_message");
-        int confirmId = getStringId(context, "updatelib_confirm");
-        int cancelId = getStringId(context, "updatelib_cancel");
-
         return new AlertDialog.Builder(context)
-                .setCustomTitle(buildCustomTitleView(context, titleId))
-                .setMessage(msgId)
-                .setPositiveButton(confirmId, (d, w) -> {
+                .setTitle(R.string.updatelib_update_check_failed_title)
+                .setMessage(R.string.updatelib_update_check_failed_message)
+                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
                     if (onConfirm != null) onConfirm.run();
                     d.dismiss();
                 })
-                .setNegativeButton(cancelId, (d, w) -> d.dismiss())
+                .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
                 .show();
     }
 
     public static AlertDialog showRateLimitedDialog(Context context, Runnable onConfirm) {
-        int titleId = getStringId(context, "updatelib_update_check_rate_limited_title");
-        int msgId = getStringId(context, "updatelib_update_check_rate_limited_message");
-        int confirmId = getStringId(context, "updatelib_confirm");
-        int cancelId = getStringId(context, "updatelib_cancel");
-
         return new AlertDialog.Builder(context)
-                .setCustomTitle(buildCustomTitleView(context, titleId))
-                .setMessage(msgId)
-                .setPositiveButton(confirmId, (d, w) -> {
+                .setTitle(R.string.updatelib_update_check_rate_limited_title)
+                .setMessage(R.string.updatelib_update_check_rate_limited_message)
+                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
                     if (onConfirm != null) onConfirm.run();
                     d.dismiss();
                 })
-                .setNegativeButton(cancelId, (d, w) -> d.dismiss())
+                .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
                 .show();
     }
 
     public static AlertDialog showNoApkDialog(Context context, Runnable onConfirm) {
-        int titleId = getStringId(context, "updatelib_update_check_no_apk_title");
-        int msgId = getStringId(context, "updatelib_update_check_no_apk_message");
-        int confirmId = getStringId(context, "updatelib_confirm");
-        int cancelId = getStringId(context, "updatelib_cancel");
-
         return new AlertDialog.Builder(context)
-                .setCustomTitle(buildCustomTitleView(context, titleId))
-                .setMessage(msgId)
-                .setPositiveButton(confirmId, (d, w) -> {
+                .setTitle(R.string.updatelib_update_check_no_apk_title)
+                .setMessage(R.string.updatelib_update_check_no_apk_message)
+                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
                     if (onConfirm != null) onConfirm.run();
                     d.dismiss();
                 })
-                .setNegativeButton(cancelId, (d, w) -> d.dismiss())
+                .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
                 .show();
     }
 
     public static AlertDialog showNotificationPermissionDialog(Context context,
                                                                 Runnable onConfirm, Runnable onCancel) {
-        int titleId = getStringId(context, "updatelib_notification_permission_title");
-        int msgId = getStringId(context, "updatelib_notification_permission_rationale");
-        int confirmId = getStringId(context, "updatelib_confirm");
-        int denyId = getStringId(context, "updatelib_deny");
-
         return new AlertDialog.Builder(context)
-                .setTitle(titleId)
-                .setMessage(msgId)
-                .setPositiveButton(confirmId, (d, w) -> {
+                .setTitle(R.string.updatelib_notification_permission_title)
+                .setMessage(R.string.updatelib_notification_permission_rationale)
+                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
                     if (onConfirm != null) onConfirm.run();
                     d.dismiss();
                 })
-                .setNegativeButton(denyId, (d, w) -> {
+                .setNegativeButton(R.string.updatelib_deny, (d, w) -> {
                     if (onCancel != null) onCancel.run();
                     d.dismiss();
                 })
@@ -170,24 +110,19 @@ public class UpdateDialogHelper {
             String apkUrl, long apkSize,
             Runnable onConfirm, Runnable onIgnore, Runnable onDismiss, Runnable onInstall) {
 
-        int layoutId = getLayoutId(context, "updatelib_dialog_update_with_progress");
-        View dialogView = LayoutInflater.from(context).inflate(layoutId, null);
+        View dialogView = LayoutInflater.from(context)
+                .inflate(R.layout.updatelib_dialog_update_with_progress, null);
 
-        LinearLayout layoutProgress = dialogView.findViewById(getId(context, "layout_progress"));
-        TextView tvVersion = dialogView.findViewById(getId(context, "tv_version"));
-        TextView tvReleaseNotes = dialogView.findViewById(getId(context, "tv_release_notes"));
-        WebView webView = dialogView.findViewById(getId(context, "webview_release_notes"));
-        TextView tvStatus = dialogView.findViewById(getId(context, "tv_status"));
-        ProgressBar progressBar = dialogView.findViewById(getId(context, "progress_bar"));
-        TextView tvProgress = dialogView.findViewById(getId(context, "tv_progress"));
+        LinearLayout layoutProgress = dialogView.findViewById(R.id.layout_progress);
+        TextView tvVersion = dialogView.findViewById(R.id.tv_version);
+        TextView tvReleaseNotes = dialogView.findViewById(R.id.tv_release_notes);
+        WebView webView = dialogView.findViewById(R.id.webview_release_notes);
+        TextView tvStatus = dialogView.findViewById(R.id.tv_status);
+        ProgressBar progressBar = dialogView.findViewById(R.id.progress_bar);
+        TextView tvProgress = dialogView.findViewById(R.id.tv_progress);
 
         // Version info
-        String currentVersion = "";
-        try {
-            if (com.mqd.updatejava.core.UpdateLibContext.isInitialized()) {
-                currentVersion = com.mqd.updatejava.UpdateManager.getCurrentVersion();
-            }
-        } catch (Exception ignored) {}
+        String currentVersion = com.mqd.updatejava.UpdateManager.getCurrentVersion();
         String versionText = currentVersion + " \u2192 " + UpdateChecker.displayVersion(version);
         if (tvVersion != null) tvVersion.setText(versionText);
 
@@ -211,27 +146,25 @@ public class UpdateDialogHelper {
             }
         }
 
-        int titleId = getStringId(context, "updatelib_update_available_title");
         AlertDialog dialog = new AlertDialog.Builder(context)
-                .setCustomTitle(buildCustomTitleView(context, titleId))
+                .setTitle(R.string.updatelib_update_available_title)
                 .setView(dialogView)
                 .setCancelable(true)
                 .create();
 
         boolean isDownloaded = onInstall != null;
 
-        String installText = getStr(context, "updatelib_update_install_now");
-        String updateText = getStr(context, "updatelib_update_now");
-        String ignoreText = getStr(context, "updatelib_update_ignore_version");
-        String bgText = getStr(context, "updatelib_update_move_to_background");
-        String downloadingText = getStr(context, "updatelib_update_downloading_label");
-        String failedText = getStr(context, "updatelib_update_download_failed");
-        String retryText = getStr(context, "updatelib_update_retry");
-        String cancelText = getStr(context, "updatelib_cancel");
+        String installText = context.getString(R.string.updatelib_update_install_now);
+        String updateText = context.getString(R.string.updatelib_update_now);
+        String ignoreText = context.getString(R.string.updatelib_update_ignore_version);
+        String bgText = context.getString(R.string.updatelib_update_move_to_background);
+        String downloadingText = context.getString(R.string.updatelib_update_downloading_label);
+        String failedText = context.getString(R.string.updatelib_update_download_failed);
+        String retryText = context.getString(R.string.updatelib_update_retry);
+        String cancelText = context.getString(R.string.updatelib_cancel);
 
         dialog.setButton(AlertDialog.BUTTON_POSITIVE,
-                isDownloaded ? installText : updateText,
-                (d, w) -> {});
+                isDownloaded ? installText : updateText, (d, w) -> {});
         dialog.setButton(AlertDialog.BUTTON_NEGATIVE, ignoreText, (d, w) -> {});
         dialog.show();
 
@@ -240,7 +173,6 @@ public class UpdateDialogHelper {
         final Runnable[] onInstallRef = new Runnable[]{onInstall};
 
         if (isDownloaded) {
-            // APK already downloaded
             Button negBtn = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
             if (negBtn != null) negBtn.setVisibility(View.GONE);
             Button posBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -252,7 +184,6 @@ public class UpdateDialogHelper {
                 });
             }
         } else {
-            // Normal download flow
             Button posBtn = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             Button negBtn = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
 
@@ -269,7 +200,6 @@ public class UpdateDialogHelper {
                     }
                     if (onConfirmRef[0] != null) onConfirmRef[0].run();
 
-                    // Start observing download state
                     final boolean[] downloadStarted = {false};
                     DownloadController.Listener listener = state -> {
                         mainHandler.post(() -> {
@@ -292,10 +222,10 @@ public class UpdateDialogHelper {
                                             if (progressBar != null) progressBar.setProgress(0);
                                             if (tvProgress != null) tvProgress.setText("");
                                             pb.setVisibility(View.GONE);
-                                            Button nb = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
-                                            if (nb != null) {
-                                                nb.setText(bgText);
-                                                nb.setOnClickListener(v3 -> {
+                                            Button nb2 = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+                                            if (nb2 != null) {
+                                                nb2.setText(bgText);
+                                                nb2.setOnClickListener(v3 -> {
                                                     dialog.dismiss();
                                                     if (onDismissRef[0] != null) onDismissRef[0].run();
                                                 });
@@ -322,11 +252,7 @@ public class UpdateDialogHelper {
                         });
                     };
                     DownloadController.addListener(listener);
-
-                    // Store listener for cleanup
-                    dialog.setOnDismissListener(d -> {
-                        DownloadController.removeListener(listener);
-                    });
+                    dialog.setOnDismissListener(d -> DownloadController.removeListener(listener));
                 });
             }
 

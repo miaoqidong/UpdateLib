@@ -1,2 +1,2 @@
 # Add project specific ProGuard rules here.
--keep class com.mqd.updatejava.** { *; }
+#-keep class com.mqd.updatejava.** { *; }

@@ -6,6 +6,8 @@ import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 
+import androidx.core.content.FileProvider;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -184,7 +186,7 @@ public class ApkInstaller {
                     fileProviderAuthority : context.getPackageName() + ".updatejava.fileprovider";
             Uri uri;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                uri = UpdateLibFileProviderHelper.getUriForFile(context, authority, file);
+                uri = FileProvider.getUriForFile(context, authority, file);
             } else {
                 uri = Uri.fromFile(file);
             }

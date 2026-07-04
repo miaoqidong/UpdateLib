@@ -43,6 +43,8 @@ android {
     }
 }
 
-// 纯 Java 模块，零额外依赖——只靠 Android SDK
+// FileProvider 由宿主项目提供，compileOnly 不打包
 dependencies {
+    //compileOnly("androidx.core:core:1.15.0")
+    implementation(libs.androidx.core)
 }
