@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -25,8 +25,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     lint {
@@ -35,6 +35,11 @@ android {
 
     buildFeatures {
         buildConfig = false
+    }
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
     }
 }
 
