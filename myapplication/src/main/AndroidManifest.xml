@@ -26,5 +26,11 @@
             android:label="更新示例(View)"
             android:theme="@style/Theme.SideGesture.View">
         </activity>
+        <activity
+            android:name=".SampleJavaActivity"
+            android:exported="true"
+            android:label="更新示例(Java)"
+            android:theme="@style/Theme.SideGesture.View">
+        </activity>
     </application>
 </manifest>

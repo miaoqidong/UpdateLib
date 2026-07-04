@@ -17,6 +17,7 @@ import com.mqd.updatelib.download.DownloadService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * 更新库公开 API 入口。
@@ -326,5 +327,71 @@ object UpdateManager {
     suspend fun getApkSize(): Long {
         val state = DataStoreHolder.updateState.data.first()
         return state.apkSize
+    }
+
+    // ────────────────────────────────────────
+    // Java 回调式 API（纯 Java 项目无需协程）
+    // ────────────────────────────────────────
+
+    private val javaScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.SupervisorJob()
+    )
+
+    /**
+     * 检查更新（Java 回调版）。
+     *
+     * @param force 是否强制检查（绕过缓存 TTL）
+     * @param callback 检查完成后的回调
+     */
+    @JvmStatic
+    fun checkForUpdate(
+        force: Boolean,
+        callback: (UpdateRepository.CheckResult) -> Unit
+    ) {
+        javaScope.launch {
+            val result = checkForUpdate(force)
+            callback(result)
+        }
+    }
+
+    /**
+     * 启动时懒检查（Java 回调版）。
+     *
+     * @param callback 是否执行了检查
+     */
+    @JvmStatic
+    fun checkOnLaunch(callback: (Boolean) -> Unit) {
+        javaScope.launch {
+            callback(checkOnLaunch())
+        }
+    }
+
+    /**
+     * 观察下载状态（Java 回调版）。
+     *
+     * 回调在状态变化时持续触发，包括进度更新。
+     * 返回 Job 可用于取消观察（如 Activity 销毁时）。
+     */
+    @JvmStatic
+    fun observeDownloadState(
+        callback: (DownloadController.DownloadUiState) -> Unit
+    ): kotlinx.coroutines.Job {
+        return javaScope.launch {
+            downloadStateFlow().collect { callback(it) }
+        }
+    }
+
+    /**
+     * 观察更新状态（Java 回调版）。
+     *
+     * 返回 Job 可用于取消观察。
+     */
+    @JvmStatic
+    fun observeUpdateState(
+        callback: (UpdateState) -> Unit
+    ): kotlinx.coroutines.Job {
+        return javaScope.launch {
+            updateStateFlow().collect { callback(it) }
+        }
     }
 }

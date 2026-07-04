@@ -104,7 +104,13 @@ private fun MainScreen(updateVm: UpdateViewModel) {
         Button(onClick = {
             context.startActivity(Intent(context, SampleViewActivity::class.java))
         }) {
-            Text(text = "传统 View 示例")
+            Text(text = "传统 View 示例 (Kotlin)")
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Button(onClick = {
+            context.startActivity(Intent(context, SampleJavaActivity::class.java))
+        }) {
+            Text(text = "传统 View 示例 (Java)")
         }
     }
 }
