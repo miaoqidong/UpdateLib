@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.mqd.updatelib.UpdateManager
 import com.mqd.updatejava.UpdateManager as UpdateManagerJava
+import com.mqd.updatesimple.UpdateManager as UpdateManagerSimple
 
 
 /**
@@ -29,6 +30,10 @@ class App : Application() {
 
         // 初始化 update-java（纯 Java 版）
         UpdateManagerJava.init(this,
+            "https://520821.cn/rule/wxzhuli.json", true)
+
+        // 初始化 update-simple（精简版，仅检查+跳转网站）
+        UpdateManagerSimple.init(this,
             "https://520821.cn/rule/wxzhuli.json", true)
     }
 }

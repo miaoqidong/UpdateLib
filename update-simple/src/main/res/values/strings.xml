@@ -1,0 +1,13 @@
+<resources>
+    <string name="updatelib_update_available_title">发现新版本</string>
+    <string name="updatelib_update_to_site">前往下载</string>
+    <string name="updatelib_update_already_latest_title">已是最新版本</string>
+
+    <string name="updatelib_update_check_failed_title">检查更新失败</string>
+    <string name="updatelib_update_check_failed_message">暂时无法获取更新信息，点击确认前往网站查看最新版本。</string>
+    <string name="updatelib_update_check_rate_limited_title">访问过于频繁</string>
+    <string name="updatelib_update_check_rate_limited_message">接口暂时限流，请稍后再试，或点击确认前往网站查看。</string>
+
+    <string name="updatelib_confirm">确认</string>
+    <string name="updatelib_cancel">取消</string>
+</resources>

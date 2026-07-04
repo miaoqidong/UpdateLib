@@ -15,6 +15,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import androidx.core.content.FileProvider;
+
 /**
  * APK 下载 + 安装器。
  */
@@ -186,8 +188,7 @@ public class ApkInstaller {
                     fileProviderAuthority : context.getPackageName() + ".updatejava.fileprovider";
             Uri uri;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                //uri = FileProvider.getUriForFile(context, authority, file);
-                uri = Uri.fromFile(file);
+                uri = FileProvider.getUriForFile(context, authority, file);
             } else {
                 uri = Uri.fromFile(file);
             }

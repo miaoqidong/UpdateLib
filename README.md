@@ -3,10 +3,11 @@
 
 基于 GitHub Releases 的 Android 应用自更新库，提供检查更新、下载 APK、安装三大核心功能。
 
-分为三个模块：
+分为四个模块：
 
 - **update-lib** — 核心库，Kotlin 编写，提供检查更新、下载管理、安装及传统 AlertDialog UI
-- **update-java** — 纯 Java 版，零外部依赖，极轻量（< 50KB），适合老项目或对 APK 体积敏感的项目
+- **update-java** — 纯 Java 版，零外部依赖，极轻量（< 55KB），适合老项目或对 APK 体积敏感的项目
+- **update-simple** — 超精简 Java 版，零外部依赖（< 30KB），仅检查更新 + 跳转网站下载，不含下载/安装功能
 - **update-compose** — Compose 扩展，依赖 update-lib，提供 Material3 风格的 Compose 弹窗 UI
 
 ---
@@ -42,6 +43,14 @@ dependencies {
 ```kotlin
 dependencies {
     implementation("com.github.miaoqidong.UpdateLib:update-java:Tag")
+}
+```
+
+**超精简 Java 版（仅检查 + 跳转网站，< 30KB）：**
+
+```kotlin
+dependencies {
+    implementation("com.github.miaoqidong.UpdateLib:update-simple:Tag")
 }
 ```
 
@@ -353,7 +362,79 @@ UpdateManager.removeDownloadListener(listener);
 | 持久化 | DataStore | SharedPreferences |
 | 异步 | Coroutines | Thread + Handler |
 | 通知 | NotificationCompat | Notification.Builder |
-| APK 体积增量 | ~200KB | < 50KB |
+| APK 体积增量 | ~200KB | < 55KB |
+
+---
+
+## update-simple 用法（纯 Java · 零依赖 · 超精简）
+
+`update-simple` 模块是 update-java 的精简版，去掉了下载和安装功能，仅保留检查更新 + 弹窗 + 跳转网站。适用于只需要通知用户去网站自行下载的场景，AAR 体积 < 30KB。
+
+### 初始化
+
+在 `Application.onCreate()` 中调用 `UpdateManager.init()`：
+
+```java
+public class App extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        // 使用 GitHub Releases
+        UpdateManager.init(this, "owner", "repo");
+
+        // 或仅使用备用源
+        UpdateManager.init(this, "https://example.com/update.json", true);
+    }
+}
+```
+
+### 快速接入
+
+一行代码完成检查 → 弹窗 → 跳转网站：
+
+```java
+public class MyActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        // 进入页面自动检查更新
+        UpdateDialogHelper.checkAndShowUpdateDialog(this);
+
+        // 按钮手动触发
+        findViewById(R.id.btnCheckUpdate).setOnClickListener(v ->
+            UpdateDialogHelper.checkAndShowUpdateDialog(this)
+        );
+    }
+}
+```
+
+### UpdateDialogHelper 方法
+
+| 方法 | 说明 |
+|---|---|
+| `checkAndShowUpdateDialog(activity)` | **推荐** 一键检查更新并弹窗，点击"前往下载"跳转网站 |
+| `showNewVersionDialog(context, version, notes, detailsUrl)` | 显示新版本对话框，带版本信息和更新说明 |
+| `showAlreadyLatestDialog(context)` | 已是最新版本弹窗 |
+| `showCheckFailedDialog(context, onConfirm)` | 检查失败弹窗，确认可跳转网站 |
+| `showRateLimitedDialog(context, onConfirm)` | API 限流弹窗 |
+| `openReleasesPage(context)` | 直接打开 Releases 页面 |
+
+### 与 update-java 的区别
+
+| | update-java | update-simple |
+|---|---|---|
+| AAR 体积 | < 55KB | **< 30KB** |
+| 检查更新 | ✓ | ✓ |
+| 下载 APK | ✓ | — |
+| 安装 APK | ✓ | — |
+| 前台下载服务 | ✓ | — |
+| 下载进度通知 | ✓ | — |
+| FileProvider | ✓ | — |
+| 外部依赖 | compileOnly androidx.core | **零** |
+| 点击"更新" | 下载并安装 | 跳转网站 |
 
 ---
 

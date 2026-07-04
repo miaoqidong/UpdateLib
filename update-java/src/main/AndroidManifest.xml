@@ -14,7 +14,7 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-  <!--      <provider
+        <provider
             android:name="com.mqd.updatejava.UpdateLibFileProvider"
             android:authorities="${applicationId}.updatejava.fileprovider"
             android:exported="false"
@@ -22,7 +22,7 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/updatelib_file_paths" />
-        </provider>-->
+        </provider>
     </application>
 
 </manifest>
