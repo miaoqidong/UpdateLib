@@ -45,6 +45,7 @@ android {
 
 // FileProvider 由宿主项目提供，compileOnly 不打包
 dependencies {
-    //compileOnly("androidx.core:core:1.15.0")
-    implementation(libs.androidx.core)
+
+    //compileOnly(libs.androidx.core)
+    //implementation(libs.androidx.core)
 }
