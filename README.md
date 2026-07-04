@@ -3,9 +3,10 @@
 
 基于 GitHub Releases 的 Android 应用自更新库，提供检查更新、下载 APK、安装三大核心功能。
 
-分为两个模块：
+分为三个模块：
 
-- **update-lib** — 核心库，纯 View 体系，提供检查更新、下载管理、安装及传统 AlertDialog UI
+- **update-lib** — 核心库，Kotlin 编写，提供检查更新、下载管理、安装及传统 AlertDialog UI
+- **update-java** — 纯 Java 版，零外部依赖，极轻量（< 50KB），适合老项目或对 APK 体积敏感的项目
 - **update-compose** — Compose 扩展，依赖 update-lib，提供 Material3 风格的 Compose 弹窗 UI
 
 ---
@@ -33,6 +34,14 @@ dependencyResolutionManagement {
 ```kotlin
 dependencies {
     implementation("com.github.miaoqidong.UpdateLib:update-lib:Tag")
+}
+```
+
+**纯 Java 零依赖（推荐老项目 / 体积敏感）：**
+
+```kotlin
+dependencies {
+    implementation("com.github.miaoqidong.UpdateLib:update-java:Tag")
 }
 ```
 
@@ -249,6 +258,102 @@ UpdateDialogHelper.showUpdateDialog(
 | `openReleasesPage(context)` | 打开 Releases 页面 |
 
 所有弹窗标题栏右上角都带有详情跳转按钮，点击会打开 `getReleasesPageUrl()` 返回的链接（优先使用备用源 `desUrl`，回退到 GitHub Releases 页面）。
+
+---
+
+## update-java 用法（纯 Java · 零依赖）
+
+`update-java` 模块专为纯 Java 老项目设计，不引入 Kotlin、协程、序列化库、DataStore 等任何额外依赖，APK 体积增量 < 50KB。
+
+### 初始化
+
+在 `Application.onCreate()` 中调用 `UpdateManager.init()`：
+
+```java
+public class App extends Application {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+
+        // 使用 GitHub Releases
+        UpdateManager.init(this, "owner", "repo");
+
+        // 或仅使用备用源
+        UpdateManager.init(this, "https://example.com/update.json", true);
+    }
+}
+```
+
+### 快速接入
+
+一行代码完成检查 → 弹窗 → 下载 → 安装：
+
+```java
+public class MyActivity extends Activity {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        // 进入页面自动检查更新
+        UpdateDialogHelper.checkAndShowUpdateDialog(this);
+
+        // 按钮手动触发
+        findViewById(R.id.btnCheckUpdate).setOnClickListener(v ->
+            UpdateDialogHelper.checkAndShowUpdateDialog(this)
+        );
+    }
+}
+```
+
+### API 与 update-lib 对应关系
+
+| update-lib (Kotlin) | update-java (Java) | 说明 |
+|---|---|---|
+| `UpdateManager.init(...)` | `UpdateManager.init(...)` | 初始化 |
+| `UpdateManager.checkForUpdate(force, callback)` | `UpdateRepository.checkAndCache(...)` | 检查更新 |
+| `UpdateManager.downloadUpdate(...)` | `UpdateManager.downloadUpdate(...)` | 开始下载 |
+| `UpdateManager.installUpdate(...)` | `UpdateManager.installUpdate(...)` | 安装 APK |
+| `UpdateManager.canInstall(context)` | `UpdateManager.canInstall(context)` | 安装权限检查 |
+| `DownloadController.flow.collect {}` | `UpdateManager.addDownloadListener(listener)` | 监听下载进度 |
+| `UpdateDialogHelper.checkAndShowUpdateDialog(...)` | `UpdateDialogHelper.checkAndShowUpdateDialog(...)` | 一键检查弹窗 |
+| `UpdateDialogHelper.showUpdateDialog(...)` | `UpdateDialogHelper.showUpdateDialog(...)` | 统一更新弹窗 |
+
+### 下载进度监听
+
+update-java 使用回调模式监听下载状态，无需协程：
+
+```java
+DownloadController.Listener listener = state -> {
+    switch (state.status) {
+        case DOWNLOADING:
+            progressBar.setProgress(state.progress);
+            break;
+        case FAILED:
+            // 下载失败
+            break;
+        case IDLE:
+            // 下载完成或空闲
+            break;
+    }
+};
+UpdateManager.addDownloadListener(listener);
+
+// 不再需要时移除
+UpdateManager.removeDownloadListener(listener);
+```
+
+### 与 update-lib 的区别
+
+| | update-lib | update-java |
+|---|---|---|
+| 语言 | Kotlin | Java |
+| 外部依赖 | kotlinx-serialization, coroutines, DataStore, AndroidX Core | **无** |
+| JSON 解析 | kotlinx.serialization | org.json（Android 内置） |
+| 持久化 | DataStore | SharedPreferences |
+| 异步 | Coroutines | Thread + Handler |
+| 通知 | NotificationCompat | Notification.Builder |
+| APK 体积增量 | ~200KB | < 50KB |
 
 ---
 

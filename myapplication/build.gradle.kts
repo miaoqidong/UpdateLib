@@ -101,6 +101,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":update-java"))
     implementation(project(":update-compose"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

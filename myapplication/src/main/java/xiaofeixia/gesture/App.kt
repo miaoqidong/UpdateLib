@@ -3,6 +3,7 @@ package xiaofeixia.gesture
 import android.app.Application
 import android.content.Context
 import com.mqd.updatelib.UpdateManager
+import com.mqd.updatejava.UpdateManager as UpdateManagerJava
 
 
 /**
@@ -25,5 +26,9 @@ class App : Application() {
             fallbackUrl = "https://520821.cn/rule/wxzhuli.json",
             fallbackOnly = true
         )
+
+        // 初始化 update-java（纯 Java 版）
+        UpdateManagerJava.init(this,
+            "https://520821.cn/rule/wxzhuli.json", true)
     }
 }

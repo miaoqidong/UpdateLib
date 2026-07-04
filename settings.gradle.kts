@@ -24,3 +24,4 @@ rootProject.name = "UpdateLib"
 include(":myapplication")
 include(":update-lib")
 include(":update-compose")
+include(":update-java")
