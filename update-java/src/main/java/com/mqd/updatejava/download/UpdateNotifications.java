@@ -143,7 +143,6 @@ public class UpdateNotifications {
     }
 
     private static int getNotificationIcon(Context context) {
-        return context.getResources().getIdentifier(
-                "ic_updatelib_notification", "drawable", context.getPackageName());
+        return context.getApplicationInfo().icon;
     }
 }
