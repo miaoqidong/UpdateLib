@@ -461,13 +461,13 @@ public class MyActivity extends Activity {
 
 | | update-java | update-simple |
 |---|---|---|
-| AAR 体积 | < 55KB | **< 7KB** |
+| AAR 体积 | < 51KB | **< 7KB** |
 | 源文件数 | 20+ | **1** |
 | 资源文件 | strings, layout, drawable, xml | strings |
 | 外部依赖 | compileOnly androidx.core | **零** |
 | GitHub Releases | ✓ | ✓ |
 | 自定义 JSON | ✓ | ✓ |
-| HTML 更新日志 | WebView | Html.fromHtml |
+| HTML 更新日志 | Html.fromHtml | Html.fromHtml |
 | 下载/安装 | ✓ | — |
 | 点击"更新" | 下载并安装 | 跳转网站 |
 

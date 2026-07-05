@@ -27,4 +27,5 @@
     <string name="updatelib_confirm">确认</string>
     <string name="updatelib_cancel">取消</string>
     <string name="updatelib_deny">拒绝</string>
+    <string name="updatelib_update_view_details">查看详情</string>
 </resources>

@@ -7,11 +7,10 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.method.LinkMovementMethod;
 import android.text.method.ScrollingMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
-import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -34,73 +33,93 @@ public class UpdateDialogHelper {
 
     private UpdateDialogHelper() {}
 
+    private static View buildCustomTitleView(Context context, int titleRes) {
+        View titleView = LayoutInflater.from(context)
+                .inflate(R.layout.updatelib_dialog_title_with_link, null);
+        ((TextView) titleView.findViewById(R.id.tv_dialog_title)).setText(titleRes);
+        titleView.findViewById(R.id.btn_open_link)
+                .setOnClickListener(v -> openReleasesPage(context));
+        return titleView;
+    }
+
     // ──────────────── 公开方法 ────────────────
 
     public static void openReleasesPage(Context context) {
+        String url = UpdateRepository.getDetailsUrl();
+        if (url == null || url.isEmpty()) url = UpdateChecker.RELEASES_PAGE_URL;
         try {
-            context.startActivity(new Intent(Intent.ACTION_VIEW,
-                    Uri.parse(UpdateChecker.RELEASES_PAGE_URL)));
+            context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
         } catch (Exception ignored) {
         }
     }
 
     public static AlertDialog showAlreadyLatestDialog(Context context) {
-        return new AlertDialog.Builder(context)
-                .setTitle(R.string.updatelib_update_already_latest_title)
-                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> d.dismiss())
-                .show();
+        AlertDialog d = new AlertDialog.Builder(context)
+                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> dd.dismiss())
+                .create();
+        d.setCustomTitle(buildCustomTitleView(context, R.string.updatelib_update_already_latest_title));
+        d.show();
+        return d;
     }
 
     public static AlertDialog showCheckFailedDialog(Context context, Runnable onConfirm) {
-        return new AlertDialog.Builder(context)
-                .setTitle(R.string.updatelib_update_check_failed_title)
+        AlertDialog d = new AlertDialog.Builder(context)
                 .setMessage(R.string.updatelib_update_check_failed_message)
-                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
+                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
                     if (onConfirm != null) onConfirm.run();
-                    d.dismiss();
+                    dd.dismiss();
                 })
-                .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
-                .show();
+                .setNegativeButton(R.string.updatelib_cancel, (dd, w) -> dd.dismiss())
+                .create();
+        d.setCustomTitle(buildCustomTitleView(context, R.string.updatelib_update_check_failed_title));
+        d.show();
+        return d;
     }
 
     public static AlertDialog showRateLimitedDialog(Context context, Runnable onConfirm) {
-        return new AlertDialog.Builder(context)
-                .setTitle(R.string.updatelib_update_check_rate_limited_title)
+        AlertDialog d = new AlertDialog.Builder(context)
                 .setMessage(R.string.updatelib_update_check_rate_limited_message)
-                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
+                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
                     if (onConfirm != null) onConfirm.run();
-                    d.dismiss();
+                    dd.dismiss();
                 })
-                .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
-                .show();
+                .setNegativeButton(R.string.updatelib_cancel, (dd, w) -> dd.dismiss())
+                .create();
+        d.setCustomTitle(buildCustomTitleView(context, R.string.updatelib_update_check_rate_limited_title));
+        d.show();
+        return d;
     }
 
     public static AlertDialog showNoApkDialog(Context context, Runnable onConfirm) {
-        return new AlertDialog.Builder(context)
-                .setTitle(R.string.updatelib_update_check_no_apk_title)
+        AlertDialog d = new AlertDialog.Builder(context)
                 .setMessage(R.string.updatelib_update_check_no_apk_message)
-                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
+                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
                     if (onConfirm != null) onConfirm.run();
-                    d.dismiss();
+                    dd.dismiss();
                 })
-                .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
-                .show();
+                .setNegativeButton(R.string.updatelib_cancel, (dd, w) -> dd.dismiss())
+                .create();
+        d.setCustomTitle(buildCustomTitleView(context, R.string.updatelib_update_check_no_apk_title));
+        d.show();
+        return d;
     }
 
     public static AlertDialog showNotificationPermissionDialog(Context context,
                                                                 Runnable onConfirm, Runnable onCancel) {
-        return new AlertDialog.Builder(context)
-                .setTitle(R.string.updatelib_notification_permission_title)
+        AlertDialog d = new AlertDialog.Builder(context)
                 .setMessage(R.string.updatelib_notification_permission_rationale)
-                .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
+                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
                     if (onConfirm != null) onConfirm.run();
-                    d.dismiss();
+                    dd.dismiss();
                 })
-                .setNegativeButton(R.string.updatelib_deny, (d, w) -> {
+                .setNegativeButton(R.string.updatelib_deny, (dd, w) -> {
                     if (onCancel != null) onCancel.run();
-                    d.dismiss();
+                    dd.dismiss();
                 })
-                .show();
+                .create();
+        d.setCustomTitle(buildCustomTitleView(context, R.string.updatelib_notification_permission_title));
+        d.show();
+        return d;
     }
 
     // ──────────────── 统一更新弹窗 ────────────────
@@ -116,41 +135,38 @@ public class UpdateDialogHelper {
         LinearLayout layoutProgress = dialogView.findViewById(R.id.layout_progress);
         TextView tvVersion = dialogView.findViewById(R.id.tv_version);
         TextView tvReleaseNotes = dialogView.findViewById(R.id.tv_release_notes);
-        WebView webView = dialogView.findViewById(R.id.webview_release_notes);
         TextView tvStatus = dialogView.findViewById(R.id.tv_status);
         ProgressBar progressBar = dialogView.findViewById(R.id.progress_bar);
         TextView tvProgress = dialogView.findViewById(R.id.tv_progress);
 
         // Version info
         String currentVersion = com.mqd.updatejava.UpdateManager.getCurrentVersion();
-        String versionText = currentVersion + " \u2192 " + UpdateChecker.displayVersion(version);
-        if (tvVersion != null) tvVersion.setText(versionText);
+        if (tvVersion != null) {
+            tvVersion.setText(context.getString(R.string.updatelib_update_version_compare,
+                    currentVersion, UpdateChecker.displayVersion(version)));
+        }
 
-        if (releaseNotes != null && !FallbackChecker.isHtmlContent(releaseNotes)) {
+        if (releaseNotes != null && !releaseNotes.trim().isEmpty()) {
             if (tvReleaseNotes != null) {
                 tvReleaseNotes.setVisibility(View.VISIBLE);
-                tvReleaseNotes.setMovementMethod(ScrollingMovementMethod.getInstance());
-                tvReleaseNotes.setText(releaseNotes);
+                if (FallbackChecker.isHtmlContent(releaseNotes)) {
+                    tvReleaseNotes.setMovementMethod(LinkMovementMethod.getInstance());
+                    tvReleaseNotes.setText(android.text.Html.fromHtml(
+                            releaseNotes, android.text.Html.FROM_HTML_MODE_LEGACY));
+                } else {
+                    tvReleaseNotes.setMovementMethod(ScrollingMovementMethod.getInstance());
+                    tvReleaseNotes.setText(releaseNotes);
+                }
             }
-            if (webView != null) webView.setVisibility(View.GONE);
-        } else if (releaseNotes != null) {
+        } else {
             if (tvReleaseNotes != null) tvReleaseNotes.setVisibility(View.GONE);
-            if (webView != null) {
-                webView.setVisibility(View.VISIBLE);
-                webView.getSettings().setJavaScriptEnabled(false);
-                int maxHeight = context.getResources().getDisplayMetrics().heightPixels / 3;
-                ViewGroup.LayoutParams lp = webView.getLayoutParams();
-                lp.height = maxHeight;
-                webView.setLayoutParams(lp);
-                webView.loadDataWithBaseURL(null, releaseNotes, "text/html", "UTF-8", null);
-            }
         }
 
         AlertDialog dialog = new AlertDialog.Builder(context)
-                .setTitle(R.string.updatelib_update_available_title)
                 .setView(dialogView)
                 .setCancelable(true)
                 .create();
+        dialog.setCustomTitle(buildCustomTitleView(context, R.string.updatelib_update_available_title));
 
         boolean isDownloaded = onInstall != null;
 
@@ -189,6 +205,10 @@ public class UpdateDialogHelper {
 
             if (posBtn != null) {
                 posBtn.setOnClickListener(v -> {
+                    if (!ApkInstaller.canInstall(context)) {
+                        ApkInstaller.gotoUnknownSourceSetting(context);
+                        return;
+                    }
                     if (layoutProgress != null) layoutProgress.setVisibility(View.VISIBLE);
                     posBtn.setVisibility(View.GONE);
                     if (negBtn != null) {

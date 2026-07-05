@@ -406,6 +406,10 @@ object UpdateDialogHelper {
 
             // 用 View.setOnClickListener 覆盖默认行为，阻止自动 dismiss
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                if (!UpdateManager.canInstall(context)) {
+                    UpdateManager.gotoUnknownSourceSetting(context)
+                    return@setOnClickListener
+                }
                 // 在版本信息下方展开进度条
                 layoutProgress.visibility = View.VISIBLE
                 it.visibility = View.GONE // 隐藏「立即更新」

@@ -104,25 +104,25 @@ private fun MainScreen(updateVm: UpdateViewModel) {
         Button(onClick = {
             context.startActivity(Intent(context, SampleViewActivity::class.java))
         }) {
-            Text(text = "传统 View 示例 (Kotlin)")
+            Text(text = "传统 View 示例 (update-lib库-Kotlin写法)")
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {
             context.startActivity(Intent(context, SampleJavaActivity::class.java))
         }) {
-            Text(text = "传统 View 示例 (Java)")
+            Text(text = "传统 View 示例 (update-lib库-Java写法)")
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {
             context.startActivity(Intent(context, SampleUpdateJavaActivity::class.java))
         }) {
-            Text(text = "传统 View 示例 (纯Java库)")
+            Text(text = "传统 View 示例 (update-java库)")
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {
             context.startActivity(Intent(context, SampleUpdateSimpleActivity::class.java))
         }) {
-            Text(text = "传统 View 示例 (纯Java Simple库)")
+            Text(text = "传统 View 示例 (update-simple库)")
         }
     }
 }
