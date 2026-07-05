@@ -8,7 +8,7 @@ import android.widget.FrameLayout;
 
 import androidx.activity.ComponentActivity;
 
-import com.mqd.updatesimple.ui.UpdateDialogHelper;
+import com.mqd.updatesimple.UpdateManager;
 
 /**
  * update-simple 模块示例——纯检查更新 + 跳转网站。
@@ -33,8 +33,7 @@ public class SampleUpdateSimpleActivity extends ComponentActivity {
             setColor(0xFF6750A4);
         }});
         btnCheckUpdate.setStateListAnimator(null);
-        btnCheckUpdate.setOnClickListener(v ->
-                UpdateDialogHelper.checkAndShowUpdateDialog(this, null));
+        btnCheckUpdate.setOnClickListener(v -> UpdateManager.check(this));
 
         FrameLayout root = new FrameLayout(this);
         root.addView(btnCheckUpdate,
@@ -45,6 +44,6 @@ public class SampleUpdateSimpleActivity extends ComponentActivity {
                 }});
         setContentView(root);
 
-        UpdateDialogHelper.checkAndShowUpdateDialog(this, null);
+        UpdateManager.check(this);
     }
 }

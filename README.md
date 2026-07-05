@@ -7,7 +7,7 @@
 
 - **update-lib** — 核心库，Kotlin 编写，提供检查更新、下载管理、安装及传统 AlertDialog UI
 - **update-java** — 纯 Java 版，零外部依赖，极轻量（< 55KB），适合老项目或对 APK 体积敏感的项目
-- **update-simple** — 超精简 Java 版，零外部依赖（< 30KB），仅检查更新 + 跳转网站下载，不含下载/安装功能
+- **update-simple** — 极简 Java 版，单文件零资源零外部依赖（< 5KB），仅检查自定义 JSON + 弹窗 + 跳转网站
 - **update-compose** — Compose 扩展，依赖 update-lib，提供 Material3 风格的 Compose 弹窗 UI
 
 ---
@@ -46,7 +46,7 @@ dependencies {
 }
 ```
 
-**超精简 Java 版（仅检查 + 跳转网站，< 30KB）：**
+**极简 Java 版（单文件 < 5KB，仅检查 JSON + 弹窗 + 跳转网站）：**
 
 ```kotlin
 dependencies {
@@ -366,13 +366,37 @@ UpdateManager.removeDownloadListener(listener);
 
 ---
 
-## update-simple 用法（纯 Java · 零依赖 · 超精简）
+## update-simple 用法（极简 · < 7KB）
 
-`update-simple` 模块是 update-java 的精简版，去掉了下载和安装功能，仅保留检查更新 + 弹窗 + 跳转网站。适用于只需要通知用户去网站自行下载的场景，AAR 体积 < 30KB。
+`update-simple` 是整个项目中最轻量的模块——**只有一个 Java 文件 + 一份 strings.xml，零外部依赖**。对话框风格与 update-java 一致。支持自定义 JSON 或 GitHub Releases 两种更新源，并支持 GitHub 优先 + JSON 兜底模式。弹窗后跳转网站下载。适用于只需要通知用户去网站自行下载的场景。
+
+### 更新源（三选一）
+
+**方式一：GitHub 优先 + JSON 兜底（推荐）**
+
+先尝试 GitHub Releases API，失败后自动降级到自定义 JSON。需要同时提供 owner/repo 和 JSON 兜底地址。
+
+**方式二：自定义 JSON**
+
+自行托管一个 JSON 文件，格式如下：
+
+```json
+{"versionName":"1.2.0","desUrl":"https://example.com/download","des":"- 修复了若干问题<br>- 新增 XX 功能"}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `versionName` | 最新版本号，如 `"1.2.0"` |
+| `desUrl` | 下载页面地址，用户点击按钮后跳转 |
+| `des` | 更新日志（可选），支持纯文本和 HTML，如包含 HTML 标签则自动用 `Html.fromHtml()` 渲染 |
+
+**方式三：GitHub Releases**
+
+传入 owner 和 repo，模块自动读取最新 Release 的 `tag_name`（版本号）和 `body`（更新日志），点击按钮跳转到 Releases 页面。GitHub 的 `body` 字段通常是 Markdown，会按 HTML 渲染。
 
 ### 初始化
 
-在 `Application.onCreate()` 中调用 `UpdateManager.init()`：
+在 `Application.onCreate()` 中调用：
 
 ```java
 public class App extends Application {
@@ -380,18 +404,21 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
 
-        // 使用 GitHub Releases
-        UpdateManager.init(this, "owner", "repo");
+        // 方式一：GitHub 优先 + JSON 兜底（推荐）
+        UpdateHelper.init(this, "owner", "repo", "https://example.com/fallback.json");
 
-        // 或仅使用备用源
-        UpdateManager.init(this, "https://example.com/update.json", true);
+        // 方式二：自定义 JSON
+        // UpdateHelper.init(this, "https://example.com/update.json");
+
+        // 方式三：纯 GitHub Releases
+        // UpdateHelper.init(this, "owner", "repo");
     }
 }
 ```
 
-### 快速接入
+### 检查更新
 
-一行代码完成检查 → 弹窗 → 跳转网站：
+一行代码完成「HTTP 请求 → 版本对比 → 弹窗 → 跳转」：
 
 ```java
 public class MyActivity extends Activity {
@@ -400,40 +427,48 @@ public class MyActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // 进入页面自动检查更新
-        UpdateDialogHelper.checkAndShowUpdateDialog(this);
+        // 进入页面自动检查
+        UpdateHelper.check(this);
 
         // 按钮手动触发
         findViewById(R.id.btnCheckUpdate).setOnClickListener(v ->
-            UpdateDialogHelper.checkAndShowUpdateDialog(this)
+            UpdateHelper.check(this)
         );
     }
 }
 ```
 
-### UpdateDialogHelper 方法
+### 对话框样式
+
+与 update-java 风格一致，纯代码构建（无布局 XML）：
+
+- 标题：发现新版本
+- 版本行：`v{当前} → v{最新}`（16sp 加粗）
+- 更新日志区域：
+  - 纯文本：14sp 可滚动 TextView（maxLines=10）
+  - HTML：`Html.fromHtml()` 渲染，`LinkMovementMethod` 支持超链接点击
+
+### API
 
 | 方法 | 说明 |
 |---|---|
-| `checkAndShowUpdateDialog(activity)` | **推荐** 一键检查更新并弹窗，点击"前往下载"跳转网站 |
-| `showNewVersionDialog(context, version, notes, detailsUrl)` | 显示新版本对话框，带版本信息和更新说明 |
-| `showAlreadyLatestDialog(context)` | 已是最新版本弹窗 |
-| `showCheckFailedDialog(context, onConfirm)` | 检查失败弹窗，确认可跳转网站 |
-| `showRateLimitedDialog(context, onConfirm)` | API 限流弹窗 |
-| `openReleasesPage(context)` | 直接打开 Releases 页面 |
+| `UpdateHelper.init(context, jsonUrl)` | 初始化（自定义 JSON 源，自动读取当前版本号） |
+| `UpdateHelper.init(context, owner, repo)` | 初始化（GitHub Releases 源，自动读取当前版本号） |
+| `UpdateHelper.init(context, owner, repo, fallbackUrl)` | 初始化（GitHub 优先 + JSON 兜底，自动读取当前版本号） |
+| `UpdateHelper.check(activity)` | 检查更新，有新版本则弹窗跳转 |
 
 ### 与 update-java 的区别
 
 | | update-java | update-simple |
 |---|---|---|
-| AAR 体积 | < 55KB | **< 30KB** |
-| 检查更新 | ✓ | ✓ |
-| 下载 APK | ✓ | — |
-| 安装 APK | ✓ | — |
-| 前台下载服务 | ✓ | — |
-| 下载进度通知 | ✓ | — |
-| FileProvider | ✓ | — |
+| AAR 体积 | < 55KB | **< 7KB** |
+| 源文件数 | 20+ | **1** |
+| 资源文件 | strings, layout, drawable, xml | strings |
 | 外部依赖 | compileOnly androidx.core | **零** |
+| GitHub Releases | ✓ | ✓ |
+| 自定义 JSON | ✓ | ✓ |
+| HTML 更新日志 | WebView | Html.fromHtml |
+| 下载/安装 | ✓ | — |
 | 点击"更新" | 下载并安装 | 跳转网站 |
 
 ---

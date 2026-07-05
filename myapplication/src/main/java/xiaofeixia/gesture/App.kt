@@ -4,7 +4,6 @@ import android.app.Application
 import android.content.Context
 import com.mqd.updatelib.UpdateManager
 import com.mqd.updatejava.UpdateManager as UpdateManagerJava
-import com.mqd.updatesimple.UpdateManager as UpdateManagerSimple
 
 
 /**
@@ -32,8 +31,12 @@ class App : Application() {
         UpdateManagerJava.init(this,
             "https://520821.cn/rule/wxzhuli.json", true)
 
-        // 初始化 update-simple（精简版，仅检查+跳转网站）
-        UpdateManagerSimple.init(this,
-            "https://520821.cn/rule/wxzhuli.json", true)
+        // 初始化 update-simple（极简版，单文件，仅检查+跳转网站）
+        // 方式一：GitHub 优先 + JSON 兜底（推荐）
+        com.mqd.updatesimple.UpdateManager.init(this, "aaronzzx", "gulugulu", "https://520821.cn/rule/wxzhuli.json")
+        // 方式二：自定义 JSON
+        // UpdateHelper.init(this, "https://520821.cn/rule/wxzhuli.json")
+        // 方式三：纯 GitHub Releases
+        // UpdateHelper.init(this, "aaronzzx", "gulugulu")
     }
 }
