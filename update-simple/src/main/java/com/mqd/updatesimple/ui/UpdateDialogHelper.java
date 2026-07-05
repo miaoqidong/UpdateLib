@@ -10,16 +10,13 @@ import android.os.Looper;
 import android.text.method.ScrollingMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.TextView;
-import android.webkit.WebView;
 import android.view.ViewGroup;
+import android.webkit.WebView;
+import android.widget.TextView;
 
 import com.mqd.updatesimple.R;
 import com.mqd.updatesimple.UpdateManager;
-import com.mqd.updatesimple.core.FallbackChecker;
-import com.mqd.updatesimple.core.UpdateChecker;
-import com.mqd.updatesimple.core.UpdateRepository;
-import com.mqd.updatesimple.core.UpdateState;
+import com.mqd.updatesimple.core.Core;
 
 /**
  * 简化版更新对话框——只展示版本信息和跳转链接，不含下载/安装功能。
@@ -34,8 +31,7 @@ public class UpdateDialogHelper {
         try {
             String url = UpdateManager.getReleasesPageUrl();
             context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
     }
 
     public static AlertDialog showAlreadyLatestDialog(Context context) {
@@ -50,8 +46,7 @@ public class UpdateDialogHelper {
                 .setTitle(R.string.updatelib_update_check_failed_title)
                 .setMessage(R.string.updatelib_update_check_failed_message)
                 .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
-                    if (onConfirm != null) onConfirm.run();
-                    d.dismiss();
+                    if (onConfirm != null) onConfirm.run(); d.dismiss();
                 })
                 .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
                 .show();
@@ -62,8 +57,7 @@ public class UpdateDialogHelper {
                 .setTitle(R.string.updatelib_update_check_rate_limited_title)
                 .setMessage(R.string.updatelib_update_check_rate_limited_message)
                 .setPositiveButton(R.string.updatelib_confirm, (d, w) -> {
-                    if (onConfirm != null) onConfirm.run();
-                    d.dismiss();
+                    if (onConfirm != null) onConfirm.run(); d.dismiss();
                 })
                 .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
                 .show();
@@ -79,10 +73,10 @@ public class UpdateDialogHelper {
         WebView webView = dialogView.findViewById(R.id.webview_release_notes);
 
         String currentVersion = UpdateManager.getCurrentVersion();
-        String versionText = currentVersion + " \u2192 " + UpdateChecker.displayVersion(version);
-        if (tvVersion != null) tvVersion.setText(versionText);
+        if (tvVersion != null)
+            tvVersion.setText(currentVersion + " \u2192 " + Core.UpdateChecker.displayVersion(version));
 
-        if (releaseNotes != null && !FallbackChecker.isHtmlContent(releaseNotes)) {
+        if (releaseNotes != null && !Core.FallbackChecker.isHtml(releaseNotes)) {
             if (tvReleaseNotes != null) {
                 tvReleaseNotes.setVisibility(View.VISIBLE);
                 tvReleaseNotes.setMovementMethod(ScrollingMovementMethod.getInstance());
@@ -94,9 +88,9 @@ public class UpdateDialogHelper {
             if (webView != null) {
                 webView.setVisibility(View.VISIBLE);
                 webView.getSettings().setJavaScriptEnabled(false);
-                int maxHeight = context.getResources().getDisplayMetrics().heightPixels / 3;
+                int maxH = context.getResources().getDisplayMetrics().heightPixels / 3;
                 ViewGroup.LayoutParams lp = webView.getLayoutParams();
-                lp.height = maxHeight;
+                lp.height = maxH;
                 webView.setLayoutParams(lp);
                 webView.loadDataWithBaseURL(null, releaseNotes, "text/html", "UTF-8", null);
             }
@@ -110,41 +104,35 @@ public class UpdateDialogHelper {
                     try {
                         String url = detailsUrl != null ? detailsUrl : UpdateManager.getReleasesPageUrl();
                         context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                    } catch (Exception ignored) {
-                    }
+                    } catch (Exception ignored) {}
                 })
                 .setNegativeButton(R.string.updatelib_cancel, (d, w) -> d.dismiss())
                 .show();
     }
 
-    // ──────────────── 一键检查并弹窗 ────────────────
+    // ─── 一键检查 ──────────────────────────────────────
 
     public static void checkAndShowUpdateDialog(Activity activity) {
         checkAndShowUpdateDialog(activity, null);
     }
 
     public static void checkAndShowUpdateDialog(Activity activity, Runnable onDismiss) {
-        UpdateRepository.checkAndCache(activity, true,
+        Core.UpdateRepository.checkAndCache(activity, true,
                 UpdateManager.getCurrentVersion(),
                 result -> mainHandler.post(() -> {
                     switch (result.type) {
-                        case NEW_VERSION:
+                        case Core.UpdateRepository.CheckResult.NEW_VERSION:
                             showNewVersionDialog(activity,
                                     result.state.latestVersion,
                                     result.state.notes,
                                     result.state.detailsUrl);
                             break;
-                        case UP_TO_DATE:
-                            showAlreadyLatestDialog(activity);
-                            break;
-                        case FAILED:
-                            showCheckFailedDialog(activity,
-                                    () -> openReleasesPage(activity));
-                            break;
-                        case RATE_LIMITED:
-                            showRateLimitedDialog(activity,
-                                    () -> openReleasesPage(activity));
-                            break;
+                        case Core.UpdateRepository.CheckResult.UP_TO_DATE:
+                            showAlreadyLatestDialog(activity); break;
+                        case Core.UpdateRepository.CheckResult.FAILED:
+                            showCheckFailedDialog(activity, () -> openReleasesPage(activity)); break;
+                        case Core.UpdateRepository.CheckResult.RATE_LIMITED:
+                            showRateLimitedDialog(activity, () -> openReleasesPage(activity)); break;
                     }
                     if (onDismiss != null) onDismiss.run();
                 }));

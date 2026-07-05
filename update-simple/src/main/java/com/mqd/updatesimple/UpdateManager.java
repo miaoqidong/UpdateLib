@@ -5,16 +5,10 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
 
-import com.mqd.updatesimple.core.UpdateChecker;
-import com.mqd.updatesimple.core.UpdateLibContext;
-import com.mqd.updatesimple.core.UpdateRepository;
+import com.mqd.updatesimple.core.Core;
 
 /**
  * 更新库公开 API 入口（纯 Java，无下载/安装功能）。
- *
- * 使用流程：
- * 1. 在 Application 中调用 init() 初始化
- * 2. 调用 checkAndShowUpdateDialog() 一键完成检查+弹窗，用户点击"立即更新"会跳转到网站下载
  */
 public class UpdateManager {
 
@@ -27,10 +21,10 @@ public class UpdateManager {
                              long currentVersionCode,
                              String fallbackUrl,
                              boolean fallbackOnly) {
-        UpdateLibContext.init(context);
+        Core.UpdateLibContext.init(context);
 
-        UpdateRepository.fallbackUrl = fallbackUrl != null ? fallbackUrl : "";
-        UpdateRepository.useFallbackOnly = fallbackOnly;
+        Core.UpdateRepository.fallbackUrl = fallbackUrl != null ? fallbackUrl : "";
+        Core.UpdateRepository.useFallbackOnly = fallbackOnly;
 
         try {
             PackageInfo pkgInfo;
@@ -49,13 +43,12 @@ public class UpdateManager {
 
             UpdateManager.currentVersion = detectedVersion;
 
-            // Always configure (even with empty owner/repo) to set currentVersionCode and RELEASES_PAGE_URL
             if (githubOwner != null && !githubOwner.isEmpty() &&
                     githubRepo != null && !githubRepo.isEmpty()) {
-                UpdateChecker.configure(githubOwner, githubRepo, detectedVersion,
+                Core.UpdateChecker.configure(githubOwner, githubRepo, detectedVersion,
                         compareByTag, detectedVersionCode);
             } else {
-                UpdateChecker.configure("", "", detectedVersion, compareByTag, detectedVersionCode);
+                Core.UpdateChecker.configure("", "", detectedVersion, compareByTag, detectedVersionCode);
             }
         } catch (Exception e) {
             UpdateManager.currentVersion = "0.0.0";
@@ -76,7 +69,7 @@ public class UpdateManager {
     }
 
     public static String getReleasesPageUrl() {
-        String cached = UpdateRepository.getDetailsUrl();
-        return (cached != null && !cached.isEmpty()) ? cached : UpdateChecker.RELEASES_PAGE_URL;
+        String cached = Core.UpdateRepository.getDetailsUrl();
+        return (cached != null && !cached.isEmpty()) ? cached : Core.UpdateChecker.RELEASES_PAGE_URL;
     }
 }
