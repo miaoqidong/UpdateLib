@@ -24,16 +24,14 @@ import android.widget.TextView;
 import com.mqd.updatejava.R;
 import com.mqd.updatejava.UpdateManager;
 import com.mqd.updatejava.core.UpdateCore;
-import com.mqd.updatejava.download.ApkInstaller;
 
 /**
- * View-based 更新对话框辅助类（纯 Java，布局全用代码构建，无 XML 布局依赖）。
+ * View-based 更新对话框辅助类（纯代码构建布局，仅核心更新弹窗 + 通用错误弹窗）。
  */
 public class UpdateDialogHelper {
 
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // 跨方法引用的 view ID（布局 XML 已移除，用 generateViewId）
     private static final int ID_BTN_LINK = View.generateViewId();
     private static final int ID_LAYOUT_PROGRESS = View.generateViewId();
     private static final int ID_TV_STATUS = View.generateViewId();
@@ -42,8 +40,6 @@ public class UpdateDialogHelper {
 
     private UpdateDialogHelper() {}
 
-    // ════════════════════ 对话框控制器 ════════════════════
-
     public static class Controller {
         private final AlertDialog dialog;
         Controller(AlertDialog dialog) { this.dialog = dialog; }
@@ -51,7 +47,7 @@ public class UpdateDialogHelper {
         public boolean isShowing() { return dialog != null && dialog.isShowing(); }
     }
 
-    // ════════════════════ 工具方法 ════════════════════
+    // ════════════════════ 工具 ════════════════════
 
     private static int dp(Context ctx, int dp) {
         return (int) (dp * ctx.getResources().getDisplayMetrics().density + 0.5f);
@@ -61,6 +57,14 @@ public class UpdateDialogHelper {
         TypedValue tv = new TypedValue();
         ctx.getTheme().resolveAttribute(android.R.attr.colorAccent, tv, true);
         return tv.data;
+    }
+
+    public static void openReleasesPage(Context context) {
+        String url = UpdateCore.getDetailsUrl();
+        if (url == null || url.isEmpty()) url = UpdateCore.RELEASES_PAGE_URL;
+        try {
+            context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception ignored) {}
     }
 
     // ════════════════════ 标题栏（代码构建） ════════════════════
@@ -124,7 +128,6 @@ public class UpdateDialogHelper {
         int pad = dp(context, 16);
         root.setPadding(pad, pad, pad, pad);
 
-        // Version comparison
         TextView tvVersion = new TextView(context);
         tvVersion.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
         tvVersion.setTypeface(tvVersion.getTypeface(), Typeface.BOLD);
@@ -135,7 +138,6 @@ public class UpdateDialogHelper {
         verLp.bottomMargin = dp(context, 8);
         root.addView(tvVersion, verLp);
 
-        // Release notes
         TextView tvNotes = new TextView(context);
         tvNotes.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         tvNotes.setMaxLines(10);
@@ -155,7 +157,7 @@ public class UpdateDialogHelper {
         root.addView(tvNotes, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        // Progress section (hidden initially)
+        // 下载进度（初始隐藏）
         LinearLayout layoutProgress = new LinearLayout(context);
         layoutProgress.setId(ID_LAYOUT_PROGRESS);
         layoutProgress.setOrientation(LinearLayout.VERTICAL);
@@ -191,81 +193,7 @@ public class UpdateDialogHelper {
         return root;
     }
 
-    // ════════════════════ 公开方法 ════════════════════
-
-    public static void openReleasesPage(Context context) {
-        String url = UpdateCore.getDetailsUrl();
-        if (url == null || url.isEmpty()) url = UpdateCore.RELEASES_PAGE_URL;
-        try {
-            context.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-        } catch (Exception ignored) {}
-    }
-
-    public static AlertDialog showAlreadyLatestDialog(Context context) {
-        AlertDialog d = new AlertDialog.Builder(context)
-                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> dd.dismiss())
-                .create();
-        d.setCustomTitle(buildTitleBar(context, R.string.updatelib_update_already_latest_title));
-        d.show();
-        return d;
-    }
-
-    public static AlertDialog showCheckFailedDialog(Context context, Runnable onConfirm) {
-        AlertDialog d = new AlertDialog.Builder(context)
-                .setMessage(R.string.updatelib_update_check_failed_message)
-                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
-                    if (onConfirm != null) onConfirm.run(); dd.dismiss();
-                })
-                .setNegativeButton(R.string.updatelib_cancel, (dd, w) -> dd.dismiss())
-                .create();
-        d.setCustomTitle(buildTitleBar(context, R.string.updatelib_update_check_failed_title));
-        d.show();
-        return d;
-    }
-
-    public static AlertDialog showRateLimitedDialog(Context context, Runnable onConfirm) {
-        AlertDialog d = new AlertDialog.Builder(context)
-                .setMessage(R.string.updatelib_update_check_rate_limited_message)
-                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
-                    if (onConfirm != null) onConfirm.run(); dd.dismiss();
-                })
-                .setNegativeButton(R.string.updatelib_cancel, (dd, w) -> dd.dismiss())
-                .create();
-        d.setCustomTitle(buildTitleBar(context, R.string.updatelib_update_check_rate_limited_title));
-        d.show();
-        return d;
-    }
-
-    public static AlertDialog showNoApkDialog(Context context, Runnable onConfirm) {
-        AlertDialog d = new AlertDialog.Builder(context)
-                .setMessage(R.string.updatelib_update_check_no_apk_message)
-                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
-                    if (onConfirm != null) onConfirm.run(); dd.dismiss();
-                })
-                .setNegativeButton(R.string.updatelib_cancel, (dd, w) -> dd.dismiss())
-                .create();
-        d.setCustomTitle(buildTitleBar(context, R.string.updatelib_update_check_no_apk_title));
-        d.show();
-        return d;
-    }
-
-    public static AlertDialog showNotificationPermissionDialog(Context context,
-                                                                Runnable onConfirm, Runnable onCancel) {
-        AlertDialog d = new AlertDialog.Builder(context)
-                .setMessage(R.string.updatelib_notification_permission_rationale)
-                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
-                    if (onConfirm != null) onConfirm.run(); dd.dismiss();
-                })
-                .setNegativeButton(R.string.updatelib_deny, (dd, w) -> {
-                    if (onCancel != null) onCancel.run(); dd.dismiss();
-                })
-                .create();
-        d.setCustomTitle(buildTitleBar(context, R.string.updatelib_notification_permission_title));
-        d.show();
-        return d;
-    }
-
-    // ════════════════════ 统一更新弹窗 ════════════════════
+    // ════════════════════ 更新弹窗 ════════════════════
 
     public static Controller showUpdateDialog(
             Context context, String version, String releaseNotes,
@@ -323,8 +251,8 @@ public class UpdateDialogHelper {
 
             if (posBtn != null) {
                 posBtn.setOnClickListener(v -> {
-                    if (!ApkInstaller.canInstall(context)) {
-                        ApkInstaller.gotoUnknownSourceSetting(context);
+                    if (!UpdateManager.canInstall(context)) {
+                        UpdateManager.gotoUnknownSourceSetting(context);
                         return;
                     }
                     if (layoutProgress != null) layoutProgress.setVisibility(View.VISIBLE);
@@ -406,6 +334,21 @@ public class UpdateDialogHelper {
         return new Controller(dialog);
     }
 
+    // ════════════════════ 通用检查失败弹窗 ════════════════════
+
+    private static void showCheckFailedDialog(Context context) {
+        AlertDialog d = new AlertDialog.Builder(context)
+                .setMessage(R.string.updatelib_update_check_failed_message)
+                .setPositiveButton(R.string.updatelib_confirm, (dd, w) -> {
+                    openReleasesPage(context);
+                    dd.dismiss();
+                })
+                .setNegativeButton(R.string.updatelib_cancel, (dd, w) -> dd.dismiss())
+                .create();
+        d.setCustomTitle(buildTitleBar(context, R.string.updatelib_update_check_failed_title));
+        d.show();
+    }
+
     // ════════════════════ 一键检查并弹窗 ════════════════════
 
     public static void checkAndShowUpdateDialog(Activity activity) {
@@ -413,24 +356,18 @@ public class UpdateDialogHelper {
     }
 
     public static void checkAndShowUpdateDialog(Activity activity, Runnable onDismiss) {
-        UpdateCore.checkAndCache(activity, true,
-                UpdateManager.getCurrentVersion(),
+        UpdateCore.checkAndCache(activity, true, UpdateManager.getCurrentVersion(),
                 result -> mainHandler.post(() -> {
                     switch (result.type) {
                         case NEW_VERSION:
                             showNewVersionDialogInternal(activity, result.state, onDismiss);
                             break;
-                        case UP_TO_DATE:
-                            showAlreadyLatestDialog(activity);
-                            break;
-                        case FAILED:
-                            showCheckFailedDialog(activity, () -> openReleasesPage(activity));
-                            break;
-                        case RATE_LIMITED:
-                            showRateLimitedDialog(activity, () -> openReleasesPage(activity));
-                            break;
-                        case NO_APK:
-                            showNoApkDialog(activity, () -> openReleasesPage(activity));
+                        default:
+                            // UP_TO_DATE: 不做任何提示
+                            // FAILED / RATE_LIMITED / NO_APK: 统一显示检查失败弹窗
+                            if (result.type != UpdateCore.CheckResult.Type.UP_TO_DATE) {
+                                showCheckFailedDialog(activity);
+                            }
                             break;
                     }
                 }));
@@ -438,15 +375,12 @@ public class UpdateDialogHelper {
 
     private static void showNewVersionDialogInternal(Activity activity, UpdateCore.UpdateState state,
                                                       Runnable onDismiss) {
-        java.io.File apkFile = ApkInstaller.apkFile(activity, state.latestVersion);
-        boolean alreadyDownloaded = ApkInstaller.isDownloaded(apkFile, state.apkSize);
+        java.io.File apkFile = UpdateManager.apkFile(activity, state.latestVersion);
+        boolean alreadyDownloaded = UpdateManager.isDownloaded(activity, state.latestVersion, state.apkSize);
 
         showUpdateDialog(
-                activity,
-                state.latestVersion,
-                state.notes,
-                state.apkUrl,
-                state.apkSize,
+                activity, state.latestVersion, state.notes,
+                state.apkUrl, state.apkSize,
                 () -> {
                     if (UpdateManager.canInstall(activity)) {
                         UpdateManager.downloadUpdate(activity, state.latestVersion, state.apkUrl, state.apkSize);
@@ -457,7 +391,7 @@ public class UpdateDialogHelper {
                 () -> {},
                 () -> {
                     if (onDismiss != null) onDismiss.run();
-                    if (ApkInstaller.isDownloaded(apkFile, state.apkSize)) {
+                    if (UpdateManager.isDownloaded(activity, state.latestVersion, state.apkSize)) {
                         UpdateManager.installUpdate(activity, state.latestVersion);
                     }
                 },

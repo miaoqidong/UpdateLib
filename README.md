@@ -6,7 +6,7 @@
 分为四个模块：
 
 - **update-lib** — 核心库，Kotlin 编写，提供检查更新、下载管理、安装及传统 AlertDialog UI
-- **update-java** — 纯 Java 版，6 个源文件，仅依赖 androidx.core，极轻量（< 35KB），适合老项目或对 APK 体积敏感的项目
+- **update-java** — 纯 Java 版，4 个源文件，仅依赖 androidx.core，极轻量（< 25KB），适合老项目或对 APK 体积敏感的项目
 - **update-simple** — 极简 Java 版，单文件零资源零外部依赖（< 5KB），仅检查自定义 JSON + 弹窗 + 跳转网站
 - **update-compose** — Compose 扩展，依赖 update-lib，提供 Material3 风格的 Compose 弹窗 UI
 
@@ -270,20 +270,18 @@ UpdateDialogHelper.showUpdateDialog(
 
 ---
 
-## update-java 用法（纯 Java · 精简架构）
+## update-java 用法（纯 Java · 极简架构）
 
-`update-java` 模块专为纯 Java 老项目设计，不引入 Kotlin、协程、序列化库、DataStore 等任何额外依赖，仅 6 个源文件，AAR 体积 < 35KB。布局采用纯代码构建（无布局 XML），核心逻辑合并为单一 UpdateCore 类。
+`update-java` 模块专为纯 Java 老项目设计，不引入 Kotlin、协程、序列化库、DataStore 等任何额外依赖，仅 4 个源文件，AAR 体积 < 25KB。布局采用纯代码构建（无布局 XML），通知系统已精简为前台 Service 最小通知。
 
 ### 架构
 
 | 文件 | 职责 |
 |---|---|
-| `UpdateManager.java` | 公开 API 入口 + 全局 Context + 下载状态管理 |
-| `core/UpdateCore.java` | 合并 8 个旧文件：GitHub API、备用源、JSON 解析、版本比较、状态持久化 |
-| `ui/UpdateDialogHelper.java` | 所有对话框（纯代码构建，无 XML 布局） |
-| `download/ApkInstaller.java` | APK 下载 + 安装 |
-| `download/DownloadService.java` | 前台下载 Service + 通知管理 |
-| `UpdateLibFileProvider.java` | FileProvider（6 行） |
+| `UpdateManager.java` | 公开 API + Context + 下载状态 + FileProvider + APK 安装/权限 |
+| `core/UpdateCore.java` | GitHub API + 备用源 + JSON 解析 + 版本比较 + 状态持久化 |
+| `ui/UpdateDialogHelper.java` | 核心更新弹窗 + 通用错误弹窗（纯代码构建） |
+| `download/DownloadService.java` | 前台下载 Service + HTTP 断点续传 + 最小化通知 |
 
 ### 初始化
 
@@ -366,14 +364,14 @@ UpdateManager.removeDownloadListener(listener);
 | | update-lib | update-java |
 |---|---|---|
 | 语言 | Kotlin | Java |
-| 源文件数 | 30+ | **6** |
+| 源文件数 | 30+ | **4** |
 | 外部依赖 | kotlinx-serialization, coroutines, DataStore, AndroidX Core | AndroidX Core（仅 FileProvider） |
 | JSON 解析 | kotlinx.serialization | org.json（Android 内置） |
 | 持久化 | DataStore | SharedPreferences |
 | 异步 | Coroutines | Thread + Handler |
 | 布局 | XML | **纯代码构建** |
-| 通知 | NotificationCompat | Notification.Builder |
-| APK 体积增量 | ~200KB | < 35KB |
+| 通知 | NotificationCompat + 多渠道 | **前台 Service 最小通知** |
+| APK 体积增量 | ~200KB | < 25KB |
 
 ---
 
@@ -472,8 +470,8 @@ public class MyActivity extends Activity {
 
 | | update-java | update-simple |
 |---|---|---|
-| AAR 体积 | < 35KB | **< 7KB** |
-| 源文件数 | 6 | **1** |
+| AAR 体积 | < 25KB | **< 7KB** |
+| 源文件数 | 4 | **1** |
 | 资源文件 | strings, xml | strings |
 | 布局构建 | 纯代码 | 纯代码 |
 | 外部依赖 | androidx.core | **零** |
@@ -481,7 +479,7 @@ public class MyActivity extends Activity {
 | 自定义 JSON | ✓ | ✓ |
 | HTML 更新日志 | Html.fromHtml | Html.fromHtml |
 | 下载/安装 | ✓ | — |
-| 通知/后台下载 | ✓ | — |
+| 通知 | 前台最小通知 | — |
 | 点击"更新" | 下载并安装 | 跳转网站 |
 
 ---

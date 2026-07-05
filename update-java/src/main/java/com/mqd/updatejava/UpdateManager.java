@@ -4,22 +4,26 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
 
+import androidx.core.content.FileProvider;
+
 import com.mqd.updatejava.core.UpdateCore;
-import com.mqd.updatejava.download.ApkInstaller;
 import com.mqd.updatejava.download.DownloadService;
 
+import java.io.File;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 更新库公开 API 入口（纯 Java 版）。
  *
+ * 合并了 Context 持有、下载状态管理、FileProvider、APK 安装/权限等逻辑。
  * 使用流程：
- * 1. 在 Application 中调用 init() 初始化
- * 2. 调用 checkAndShowUpdateDialog() 一键完成检查+弹窗+下载+安装
+ * 1. Application.onCreate() 中调用 init()
+ * 2. UpdateDialogHelper.checkAndShowUpdateDialog(activity)
  */
 public class UpdateManager {
 
@@ -27,7 +31,7 @@ public class UpdateManager {
     private static String currentVersion = "";
     private static String fileProviderAuthority = "";
 
-    // ── 下载状态（原 DownloadController） ──
+    // ── 下载状态 ──
 
     public enum DownloadStatus { IDLE, DOWNLOADING, FAILED }
 
@@ -46,9 +50,6 @@ public class UpdateManager {
 
     // ════════════════════ 初始化 ════════════════════
 
-    /**
-     * 初始化更新库。
-     */
     public static void init(Context context,
                              String githubOwner, String githubRepo,
                              String currentVersion,
@@ -67,8 +68,7 @@ public class UpdateManager {
             PackageInfo pkgInfo;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 pkgInfo = context.getPackageManager().getPackageInfo(
-                        context.getPackageName(),
-                        PackageManager.PackageInfoFlags.of(0));
+                        context.getPackageName(), PackageManager.PackageInfoFlags.of(0));
             } else {
                 pkgInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
             }
@@ -82,8 +82,7 @@ public class UpdateManager {
 
             if (githubOwner != null && !githubOwner.isEmpty() &&
                     githubRepo != null && !githubRepo.isEmpty()) {
-                UpdateCore.configure(githubOwner, githubRepo, detectedVersion,
-                        compareByTag, detectedVersionCode);
+                UpdateCore.configure(githubOwner, githubRepo, detectedVersion, compareByTag, detectedVersionCode);
             } else {
                 UpdateCore.configure("", "", detectedVersion, compareByTag, detectedVersionCode);
             }
@@ -91,7 +90,7 @@ public class UpdateManager {
             String authority = (fileProviderAuthority != null && !fileProviderAuthority.isEmpty())
                     ? fileProviderAuthority
                     : context.getPackageName() + ".updatejava.fileprovider";
-            ApkInstaller.configure(authority);
+            UpdateManager.fileProviderAuthority = authority;
         } catch (Exception e) {
             UpdateManager.currentVersion = "0.0.0";
         }
@@ -124,17 +123,91 @@ public class UpdateManager {
         DownloadService.start(context, version, url, size);
     }
 
-    public static boolean installUpdate(Context context, String version) {
-        java.io.File file = ApkInstaller.apkFile(context, version);
-        return ApkInstaller.installApk(context, file);
+    public static boolean isDownloaded(Context context, String version, long expectedSize) {
+        File file = apkFile(context, version);
+        if (!file.exists() || file.length() <= 0) return false;
+        return expectedSize <= 0 || file.length() == expectedSize;
     }
 
+    public static boolean installUpdate(Context context, String version) {
+        File file = apkFile(context, version);
+        try {
+            String authority = !fileProviderAuthority.isEmpty()
+                    ? fileProviderAuthority : context.getPackageName() + ".updatejava.fileprovider";
+            Uri uri;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                uri = FileProvider.getUriForFile(context, authority, file);
+            } else {
+                uri = Uri.fromFile(file);
+            }
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "application/vnd.android.package-archive");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ════════════════════ 文件工具 ════════════════════
+
+    private static final String UPDATE_DIR_NAME = "update";
+
+    private static File updateDir(Context context) {
+        File base = context.getExternalCacheDir();
+        if (base == null) base = context.getCacheDir();
+        return new File(base, UPDATE_DIR_NAME);
+    }
+
+    private static String apkFileName(String version) {
+        String safe = (version != null && !version.trim().isEmpty()) ? version.trim() : "update";
+        safe = safe.replaceAll("[^A-Za-z0-9._-]", "_");
+        return safe + ".apk";
+    }
+
+    public static File apkFile(Context context, String version) {
+        return new File(updateDir(context), apkFileName(version));
+    }
+
+    public static void clearOutdatedApks(File dir, String keepFileName) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        String keepPart = keepFileName + ".part";
+        for (File file : files) {
+            if (!file.isFile()) continue;
+            String name = file.getName();
+            boolean isApk = name.toLowerCase().endsWith(".apk");
+            boolean isPart = name.toLowerCase().endsWith(".apk.part");
+            if ((isApk || isPart) && !name.equals(keepFileName) && !name.equals(keepPart)) {
+                file.delete();
+            }
+        }
+    }
+
+    // ════════════════════ 权限 ════════════════════
+
     public static boolean canInstall(Context context) {
-        return ApkInstaller.canInstall(context);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return context.getPackageManager().canRequestPackageInstalls();
+        }
+        return true;
     }
 
     public static void gotoUnknownSourceSetting(Context context) {
-        ApkInstaller.gotoUnknownSourceSetting(context);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        try {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+            intent.setData(Uri.parse("package:" + context.getPackageName()));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(intent);
+        } catch (Exception e) {
+            try {
+                context.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            } catch (Exception ignored) {}
+        }
     }
 
     public static boolean canNotify(Context context) {
@@ -150,7 +223,7 @@ public class UpdateManager {
             intent.putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
         } else {
             intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.setData(android.net.Uri.fromParts("package", context.getPackageName(), null));
+            intent.setData(Uri.fromParts("package", context.getPackageName(), null));
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try { context.startActivity(intent); }
@@ -160,12 +233,7 @@ public class UpdateManager {
         }
     }
 
-    public static boolean isDownloaded(Context context, String version, long expectedSize) {
-        java.io.File file = ApkInstaller.apkFile(context, version);
-        return ApkInstaller.isDownloaded(file, expectedSize);
-    }
-
-    // ════════════════════ 下载状态监听 ════════════════════
+    // ════════════════════ 下载状态管理 ════════════════════
 
     public static void addDownloadListener(DownloadListener listener) {
         if (listener != null) downloadListeners.add(listener);
@@ -193,8 +261,6 @@ public class UpdateManager {
         }
         notifyDownloadListeners();
     }
-
-    // ════════════════════ 下载状态管理（供 DownloadService 调用） ════════════════════
 
     public static void onDownloadStart(String version) {
         synchronized (downloadState) {
@@ -231,8 +297,10 @@ public class UpdateManager {
 
     private static void notifyDownloadListeners() {
         DownloadState snapshot = getDownloadState();
-        for (DownloadListener listener : downloadListeners) {
-            listener.onStateChanged(snapshot);
-        }
+        for (DownloadListener l : downloadListeners) l.onStateChanged(snapshot);
     }
+
+    // ════════════════════ FileProvider ════════════════════
+
+    public static class LibFileProvider extends FileProvider {}
 }

@@ -3,7 +3,6 @@ package com.mqd.updatejava.download;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
-import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -14,33 +13,34 @@ import android.os.IBinder;
 import android.os.Looper;
 
 import com.mqd.updatejava.UpdateManager;
-import com.mqd.updatejava.core.UpdateCore;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 前台下载 Service + 通知管理（合并自 DownloadService + UpdateNotifications）。
+ * 前台下载 Service + HTTP 断点续传下载（合并自 DownloadService + ApkInstaller 下载逻辑）。
  */
 public class DownloadService extends Service {
 
     private static final String EXTRA_VERSION = "extra_version";
     private static final String EXTRA_URL = "extra_url";
     private static final String EXTRA_SIZE = "extra_size";
-    private static final int NOTIFY_STEP = 2;
 
-    private static final String CHANNEL_UPDATE = "updatejava_update";
-    private static final String CHANNEL_DOWNLOAD = "updatejava_download";
-
-    public static final int NOTIFICATION_ID_NEW_VERSION = 1001;
-    public static final int NOTIFICATION_ID_DOWNLOAD = 1002;
+    private static final int CONNECT_TIMEOUT_MS = 10000;
+    private static final int READ_TIMEOUT_MS = 20000;
+    private static final int BUFFER_SIZE = 8 * 1024;
+    private static final String CHANNEL_ID = "updatelib_dl";
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private volatile boolean isDownloading = false;
     private int lastStartId = -1;
-
-    // ════════════════════ 启动 ════════════════════
 
     public static void start(Context context, String version, String url, long size) {
         Intent intent = new Intent(context, DownloadService.class);
@@ -59,7 +59,7 @@ public class DownloadService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         lastStartId = startId;
-        startForegroundCompat(UpdateManager.getDownloadState().progress);
+        startForegroundCompat(0);
 
         if (isDownloading) return START_NOT_STICKY;
 
@@ -74,7 +74,6 @@ public class DownloadService extends Service {
 
         isDownloading = true;
         UpdateManager.onDownloadStart(version);
-        cancelNewVersion(this);
 
         final String fVersion = version;
         final String fUrl = url;
@@ -82,17 +81,17 @@ public class DownloadService extends Service {
 
         executor.execute(() -> {
             try {
-                java.io.File dir = ApkInstaller.updateDir(DownloadService.this);
-                java.io.File dest = ApkInstaller.apkFile(DownloadService.this, fVersion);
-                ApkInstaller.clearOutdatedApks(dir, dest.getName());
+                File dir = updateDir();
+                File dest = apkFile(fVersion);
+                UpdateManager.clearOutdatedApks(dir, dest.getName());
 
                 final int[] lastNotified = {-1};
-                boolean success = ApkInstaller.download(fUrl, dest, fSize, percent -> {
+                boolean success = downloadApk(fUrl, dest, fSize, percent -> {
                     mainHandler.post(() -> {
                         UpdateManager.onDownloadProgress(percent);
-                        if (percent >= 100 || percent - lastNotified[0] >= NOTIFY_STEP) {
+                        if (percent >= 100 || percent - lastNotified[0] >= 2) {
                             lastNotified[0] = percent;
-                            notifyDownloadProgress(DownloadService.this, percent);
+                            updateForegroundNotification(percent);
                         }
                     });
                 });
@@ -100,13 +99,10 @@ public class DownloadService extends Service {
                 mainHandler.post(() -> {
                     if (success) {
                         UpdateManager.onDownloadFinish();
-                        stopForegroundCompat();
-                        showDownloadDone(DownloadService.this, fVersion);
                     } else {
                         UpdateManager.onDownloadFailed(fVersion);
-                        stopForegroundCompat();
-                        showDownloadFailed(DownloadService.this);
                     }
+                    stopForegroundCompat();
                     isDownloading = false;
                     stopSelfResult(lastStartId);
                 });
@@ -114,7 +110,6 @@ public class DownloadService extends Service {
                 mainHandler.post(() -> {
                     UpdateManager.onDownloadFailed(fVersion);
                     stopForegroundCompat();
-                    showDownloadFailed(DownloadService.this);
                     isDownloading = false;
                     stopSelfResult(lastStartId);
                 });
@@ -129,136 +124,173 @@ public class DownloadService extends Service {
         executor.shutdownNow();
     }
 
-    // ════════════════════ 前台通知 ════════════════════
+    // ════════════════════ 文件路径 ════════════════════
+
+    private File updateDir() {
+        File base = getExternalCacheDir();
+        if (base == null) base = getCacheDir();
+        return new File(base, "update");
+    }
+
+    private File apkFile(String version) {
+        String safe = (version != null && !version.trim().isEmpty()) ? version.trim() : "update";
+        safe = safe.replaceAll("[^A-Za-z0-9._-]", "_");
+        return new File(updateDir(), safe + ".apk");
+    }
+
+    // ════════════════════ HTTP 断点续传下载 ════════════════════
+
+    private interface ProgressCallback {
+        void onProgress(int percent);
+    }
+
+    private static boolean downloadApk(String url, File destFile, long expectedSize,
+                                        ProgressCallback onProgress) {
+        File partFile = new File(destFile.getParentFile(), destFile.getName() + ".part");
+        HttpURLConnection conn = null;
+        try {
+            destFile.getParentFile().mkdirs();
+
+            if (isDownloaded(destFile, expectedSize)) {
+                if (onProgress != null) onProgress.onProgress(100);
+                return true;
+            }
+
+            long existing = 0L;
+            if (partFile.exists()) existing = partFile.length();
+            if (expectedSize > 0 && existing > expectedSize) {
+                partFile.delete();
+                existing = 0L;
+            }
+            if (expectedSize > 0 && existing == expectedSize) {
+                return finalizePart(partFile, destFile, expectedSize, onProgress);
+            }
+
+            conn = (HttpURLConnection) new URL(url).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+            conn.setReadTimeout(READ_TIMEOUT_MS);
+            conn.setInstanceFollowRedirects(true);
+            if (existing > 0) conn.setRequestProperty("Range", "bytes=" + existing + "-");
+
+            int code = conn.getResponseCode();
+            if (code == HttpURLConnection.HTTP_PARTIAL) {
+                /* append */
+            } else if (code == HttpURLConnection.HTTP_OK) {
+                existing = 0L;
+                partFile.delete();
+            } else {
+                return false;
+            }
+            boolean append = (code == HttpURLConnection.HTTP_PARTIAL);
+
+            long remaining = conn.getContentLength();
+            long total = expectedSize > 0 ? expectedSize :
+                    (remaining > 0 ? existing + remaining : -1L);
+            long downloaded = existing;
+            int lastPercent = -1;
+
+            InputStream input = conn.getInputStream();
+            FileOutputStream output = new FileOutputStream(partFile, append);
+            byte[] buffer = new byte[BUFFER_SIZE];
+            int read;
+            while ((read = input.read(buffer)) != -1) {
+                output.write(buffer, 0, read);
+                downloaded += read;
+                if (total > 0) {
+                    int percent = (int) ((downloaded * 100) / total);
+                    if (percent > 100) percent = 100;
+                    if (percent != lastPercent && onProgress != null) {
+                        lastPercent = percent;
+                        onProgress.onProgress(percent);
+                    }
+                }
+            }
+            output.flush();
+            output.close();
+            input.close();
+
+            return finalizePart(partFile, destFile, expectedSize, onProgress);
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static boolean finalizePart(File partFile, File destFile, long expectedSize,
+                                         ProgressCallback onProgress) {
+        if (expectedSize > 0 && partFile.length() != expectedSize) {
+            partFile.delete();
+            return false;
+        }
+        if (destFile.exists()) destFile.delete();
+        if (!partFile.renameTo(destFile)) {
+            try {
+                FileInputStream fis = new FileInputStream(partFile);
+                FileOutputStream fos = new FileOutputStream(destFile);
+                byte[] buf = new byte[BUFFER_SIZE];
+                int r;
+                while ((r = fis.read(buf)) != -1) fos.write(buf, 0, r);
+                fis.close();
+                fos.close();
+                partFile.delete();
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        if (onProgress != null) onProgress.onProgress(100);
+        return true;
+    }
+
+    private static boolean isDownloaded(File file, long expectedSize) {
+        if (!file.exists() || file.length() <= 0) return false;
+        return expectedSize <= 0 || file.length() == expectedSize;
+    }
+
+    // ════════════════════ 最小化前台通知 ════════════════════
 
     private void startForegroundCompat(int progress) {
         try {
-            Notification notification = buildDownloadNotification(this, progress);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID_DOWNLOAD, notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
-            } else {
-                startForeground(NOTIFICATION_ID_DOWNLOAD, notification);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+                if (nm != null && nm.getNotificationChannel(CHANNEL_ID) == null) {
+                    nm.createNotificationChannel(new NotificationChannel(
+                            CHANNEL_ID, "更新下载", NotificationManager.IMPORTANCE_LOW));
+                }
             }
+            int p = Math.max(0, Math.min(100, progress));
+            Notification n = new Notification.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(getApplicationInfo().icon)
+                    .setContentTitle("正在下载更新")
+                    .setContentText(p + "%")
+                    .setProgress(100, p, false)
+                    .setOngoing(true)
+                    .build();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(1, n);
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void updateForegroundNotification(int progress) {
+        try {
+            int p = Math.max(0, Math.min(100, progress));
+            Notification n = new Notification.Builder(this, CHANNEL_ID)
+                    .setSmallIcon(getApplicationInfo().icon)
+                    .setContentTitle("正在下载更新")
+                    .setContentText(p + "%")
+                    .setProgress(100, p, false)
+                    .setOngoing(true)
+                    .build();
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            if (nm != null) nm.notify(1, n);
         } catch (Exception ignored) {}
     }
 
     private void stopForegroundCompat() {
         try { stopForeground(STOP_FOREGROUND_REMOVE); } catch (Exception ignored) {}
-    }
-
-    // ════════════════════ 通知渠道 ════════════════════
-
-    private static void ensureChannels(Context context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
-        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm == null) return;
-        if (nm.getNotificationChannel(CHANNEL_UPDATE) == null) {
-            nm.createNotificationChannel(new NotificationChannel(
-                    CHANNEL_UPDATE, "更新提醒", NotificationManager.IMPORTANCE_LOW));
-        }
-        if (nm.getNotificationChannel(CHANNEL_DOWNLOAD) == null) {
-            nm.createNotificationChannel(new NotificationChannel(
-                    CHANNEL_DOWNLOAD, "下载进度", NotificationManager.IMPORTANCE_LOW));
-        }
-    }
-
-    private static PendingIntent contentIntent(Context context) {
-        Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
-        if (intent != null) {
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        } else {
-            intent = new Intent();
-        }
-        int flags = PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT;
-        return PendingIntent.getActivity(context, 0, intent, flags);
-    }
-
-    private static int getNotificationIcon(Context context) {
-        return context.getApplicationInfo().icon;
-    }
-
-    private static void notifySafely(Context context, int id, Notification notification) {
-        try {
-            NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            if (nm != null) nm.notify(id, notification);
-        } catch (Exception ignored) {}
-    }
-
-    // ════════════════════ 公开通知 API ════════════════════
-
-    public static void showNewVersion(Context context, String version) {
-        ensureChannels(context);
-        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ? new Notification.Builder(context, CHANNEL_UPDATE)
-                : new Notification.Builder(context);
-        String contentText = version != null
-                ? UpdateCore.displayVersion(version) + " 可更新，点击查看" : "发现新版本";
-        Notification notification = builder
-                .setSmallIcon(getNotificationIcon(context))
-                .setContentTitle("发现新版本")
-                .setContentText(contentText)
-                .setContentIntent(contentIntent(context))
-                .setAutoCancel(true)
-                .build();
-        notifySafely(context, NOTIFICATION_ID_NEW_VERSION, notification);
-    }
-
-    public static void cancelNewVersion(Context context) {
-        NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        if (nm != null) nm.cancel(NOTIFICATION_ID_NEW_VERSION);
-    }
-
-    public static Notification buildDownloadNotification(Context context, int progress) {
-        ensureChannels(context);
-        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ? new Notification.Builder(context, CHANNEL_DOWNLOAD)
-                : new Notification.Builder(context);
-        int p = Math.max(0, Math.min(100, progress));
-        return builder
-                .setSmallIcon(getNotificationIcon(context))
-                .setContentTitle("正在下载更新")
-                .setContentText(p + "%")
-                .setProgress(100, p, false)
-                .setOngoing(true)
-                .setContentIntent(contentIntent(context))
-                .build();
-    }
-
-    public static void notifyDownloadProgress(Context context, int progress) {
-        notifySafely(context, NOTIFICATION_ID_DOWNLOAD, buildDownloadNotification(context, progress));
-    }
-
-    public static void showDownloadDone(Context context, String version) {
-        ensureChannels(context);
-        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ? new Notification.Builder(context, CHANNEL_DOWNLOAD)
-                : new Notification.Builder(context);
-        String contentText = "点击安装 " + UpdateCore.displayVersion(version);
-        Notification notification = builder
-                .setSmallIcon(getNotificationIcon(context))
-                .setContentTitle("下载完成")
-                .setContentText(contentText)
-                .setContentIntent(contentIntent(context))
-                .setAutoCancel(true)
-                .setOngoing(false)
-                .build();
-        notifySafely(context, NOTIFICATION_ID_DOWNLOAD, notification);
-    }
-
-    public static void showDownloadFailed(Context context) {
-        ensureChannels(context);
-        Notification.Builder builder = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ? new Notification.Builder(context, CHANNEL_DOWNLOAD)
-                : new Notification.Builder(context);
-        Notification notification = builder
-                .setSmallIcon(getNotificationIcon(context))
-                .setContentTitle("下载失败")
-                .setContentText("点击重试")
-                .setContentIntent(contentIntent(context))
-                .setAutoCancel(true)
-                .setOngoing(false)
-                .build();
-        notifySafely(context, NOTIFICATION_ID_DOWNLOAD, notification);
     }
 }

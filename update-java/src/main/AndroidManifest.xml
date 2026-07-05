@@ -15,7 +15,7 @@
             android:foregroundServiceType="dataSync" />
 
         <provider
-            android:name="com.mqd.updatejava.UpdateLibFileProvider"
+            android:name="com.mqd.updatejava.UpdateManager$LibFileProvider"
             android:authorities="${applicationId}.updatejava.fileprovider"
             android:exported="false"
             android:grantUriPermissions="true">
