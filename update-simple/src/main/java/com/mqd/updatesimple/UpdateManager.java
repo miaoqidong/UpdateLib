@@ -123,9 +123,32 @@ public class UpdateManager {
 
             if (result != null && !result[0].isEmpty() && isNewer(result[0], curVer)) {
                 String remote = result[0], targetUrl = result[1], notes = result[2];
-                mainHandler.post(() -> showDialog(act, remote, targetUrl, notes));
+                // 如果更新内容是纯 URL，获取该 URL 的页面内容替代之
+                if (isPlainUrl(notes)) {
+                    String fetched = fetchUrlContent(notes);
+                    if (fetched != null && !fetched.isEmpty()) notes = fetched;
+                }
+                final String finalNotes = notes;
+                mainHandler.post(() -> showDialog(act, remote, targetUrl, finalNotes));
             }
         }).start();
+    }
+
+    /** 获取 URL 指向的页面内容（纯文本或 HTML），失败返回 null。 */
+    private static String fetchUrlContent(String url) {
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(5000); c.setReadTimeout(8000);
+            if (c.getResponseCode() == HttpURLConnection.HTTP_OK) {
+                BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream()));
+                StringBuilder sb = new StringBuilder(); String l;
+                while ((l = r.readLine()) != null) sb.append(l);
+                r.close(); c.disconnect();
+                return sb.toString();
+            }
+            c.disconnect();
+        } catch (Exception ignored) {}
+        return null;
     }
 
     /** 执行 HTTP 请求并解析，返回 [versionName, targetUrl, releaseNotes] 或 null。 */
@@ -222,6 +245,14 @@ public class UpdateManager {
                 || s.startsWith("<");
     }
 
+    /** 判断内容是否为纯 URL（http/https 开头且不含空格/换行）。 */
+    private static boolean isPlainUrl(String content) {
+        if (content == null) return false;
+        String s = content.trim();
+        return (s.startsWith("http://") || s.startsWith("https://"))
+                && !s.contains(" ") && !s.contains("\n");
+    }
+
     private static void showDialog(Activity act, String newVer, String targetUrl, String releaseNotes) {
         float density = act.getResources().getDisplayMetrics().density;
         int pad = (int) (16 * density);
@@ -246,6 +277,10 @@ public class UpdateManager {
             if (isHtml(notes)) {
                 tvNotes.setMovementMethod(LinkMovementMethod.getInstance());
                 tvNotes.setText(android.text.Html.fromHtml(notes, android.text.Html.FROM_HTML_MODE_LEGACY));
+            } else if (isPlainUrl(notes)) {
+                tvNotes.setMovementMethod(LinkMovementMethod.getInstance());
+                String wrapped = "<a href=\"" + notes + "\">" + notes + "</a>";
+                tvNotes.setText(android.text.Html.fromHtml(wrapped, android.text.Html.FROM_HTML_MODE_LEGACY));
             } else {
                 tvNotes.setMovementMethod(ScrollingMovementMethod.getInstance());
                 tvNotes.setText(notes);

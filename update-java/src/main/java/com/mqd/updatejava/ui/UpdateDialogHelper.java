@@ -67,6 +67,33 @@ public class UpdateDialogHelper {
         } catch (Exception ignored) {}
     }
 
+    /** 判断内容是否为纯 URL（http/https 开头且不含空格/换行）。 */
+    private static boolean isPlainUrl(String content) {
+        if (content == null) return false;
+        String s = content.trim();
+        return (s.startsWith("http://") || s.startsWith("https://"))
+                && !s.contains(" ") && !s.contains("\n");
+    }
+
+    /** 获取 URL 指向的页面内容（纯文本或 HTML），失败返回 null。 */
+    private static String fetchUrlContent(String url) {
+        try {
+            java.net.HttpURLConnection c = (java.net.HttpURLConnection)
+                    new java.net.URL(url).openConnection();
+            c.setConnectTimeout(5000); c.setReadTimeout(8000);
+            if (c.getResponseCode() == java.net.HttpURLConnection.HTTP_OK) {
+                java.io.BufferedReader r = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(c.getInputStream()));
+                StringBuilder sb = new StringBuilder(); String l;
+                while ((l = r.readLine()) != null) sb.append(l);
+                r.close(); c.disconnect();
+                return sb.toString();
+            }
+            c.disconnect();
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     // ════════════════════ 标题栏（代码构建） ════════════════════
 
     private static View buildTitleBar(Context context, int titleRes) {
@@ -147,6 +174,10 @@ public class UpdateDialogHelper {
             if (UpdateCore.isHtmlContent(releaseNotes)) {
                 tvNotes.setMovementMethod(LinkMovementMethod.getInstance());
                 tvNotes.setText(Html.fromHtml(releaseNotes, Html.FROM_HTML_MODE_LEGACY));
+            } else if (isPlainUrl(releaseNotes)) {
+                tvNotes.setMovementMethod(LinkMovementMethod.getInstance());
+                String wrapped = "<a href=\"" + releaseNotes.trim() + "\">" + releaseNotes.trim() + "</a>";
+                tvNotes.setText(Html.fromHtml(wrapped, Html.FROM_HTML_MODE_LEGACY));
             } else {
                 tvNotes.setMovementMethod(ScrollingMovementMethod.getInstance());
                 tvNotes.setText(releaseNotes);
@@ -357,20 +388,30 @@ public class UpdateDialogHelper {
 
     public static void checkAndShowUpdateDialog(Activity activity, Runnable onDismiss) {
         UpdateCore.checkAndCache(activity, true, UpdateManager.getCurrentVersion(),
-                result -> mainHandler.post(() -> {
-                    switch (result.type) {
-                        case NEW_VERSION:
-                            showNewVersionDialogInternal(activity, result.state, onDismiss);
-                            break;
-                        default:
-                            // UP_TO_DATE: 不做任何提示
-                            // FAILED / RATE_LIMITED / NO_APK: 统一显示检查失败弹窗
-                            if (result.type != UpdateCore.CheckResult.Type.UP_TO_DATE) {
-                                showCheckFailedDialog(activity);
-                            }
-                            break;
+                result -> {
+                    // 如果更新内容是纯 URL，先获取页面内容
+                    if (result.type == UpdateCore.CheckResult.Type.NEW_VERSION
+                            && isPlainUrl(result.state.notes)) {
+                        String fetched = fetchUrlContent(result.state.notes);
+                        if (fetched != null && !fetched.isEmpty()) {
+                            result.state.notes = fetched;
+                        }
                     }
-                }));
+                    mainHandler.post(() -> {
+                        switch (result.type) {
+                            case NEW_VERSION:
+                                showNewVersionDialogInternal(activity, result.state, onDismiss);
+                                break;
+                            default:
+                                // UP_TO_DATE: 不做任何提示
+                                // FAILED / RATE_LIMITED / NO_APK: 统一显示检查失败弹窗
+                                if (result.type != UpdateCore.CheckResult.Type.UP_TO_DATE) {
+                                    showCheckFailedDialog(activity);
+                                }
+                                break;
+                        }
+                    });
+                });
     }
 
     private static void showNewVersionDialogInternal(Activity activity, UpdateCore.UpdateState state,
