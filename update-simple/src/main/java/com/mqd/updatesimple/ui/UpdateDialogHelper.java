@@ -8,10 +8,10 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.method.ScrollingMovementMethod;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.mqd.updatesimple.R;
@@ -65,40 +65,55 @@ public class UpdateDialogHelper {
 
     public static AlertDialog showNewVersionDialog(Context context, String version,
                                                     String releaseNotes, String detailsUrl) {
-        View dialogView = LayoutInflater.from(context)
-                .inflate(R.layout.updatelib_dialog_update, null);
+        float density = context.getResources().getDisplayMetrics().density;
+        int pad = (int) (16 * density);
 
-        TextView tvVersion = dialogView.findViewById(R.id.tv_version);
-        TextView tvReleaseNotes = dialogView.findViewById(R.id.tv_release_notes);
-        WebView webView = dialogView.findViewById(R.id.webview_release_notes);
+        LinearLayout root = new LinearLayout(context);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(pad, pad, pad, pad);
 
-        String currentVersion = UpdateManager.getCurrentVersion();
-        if (tvVersion != null)
-            tvVersion.setText(currentVersion + " \u2192 " + Core.UpdateChecker.displayVersion(version));
+        TextView tvVersion = new TextView(context);
+        tvVersion.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        tvVersion.setTextSize(16);
+        tvVersion.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        ((LinearLayout.LayoutParams) tvVersion.getLayoutParams()).bottomMargin = (int) (8 * density);
+        String verText = UpdateManager.getCurrentVersion()
+                + " \u2192 " + Core.UpdateChecker.displayVersion(version);
+        tvVersion.setText(verText);
+        root.addView(tvVersion);
+
+        TextView tvReleaseNotes = new TextView(context);
+        tvReleaseNotes.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        tvReleaseNotes.setTextSize(14);
+        tvReleaseNotes.setMaxLines(10);
+        tvReleaseNotes.setMovementMethod(ScrollingMovementMethod.getInstance());
+        root.addView(tvReleaseNotes);
+
+        WebView webView = new WebView(context);
+        webView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        webView.setVisibility(View.GONE);
+        root.addView(webView);
 
         if (releaseNotes != null && !Core.FallbackChecker.isHtml(releaseNotes)) {
-            if (tvReleaseNotes != null) {
-                tvReleaseNotes.setVisibility(View.VISIBLE);
-                tvReleaseNotes.setMovementMethod(ScrollingMovementMethod.getInstance());
-                tvReleaseNotes.setText(releaseNotes);
-            }
-            if (webView != null) webView.setVisibility(View.GONE);
+            tvReleaseNotes.setVisibility(View.VISIBLE);
+            tvReleaseNotes.setText(releaseNotes);
         } else if (releaseNotes != null) {
-            if (tvReleaseNotes != null) tvReleaseNotes.setVisibility(View.GONE);
-            if (webView != null) {
-                webView.setVisibility(View.VISIBLE);
-                webView.getSettings().setJavaScriptEnabled(false);
-                int maxH = context.getResources().getDisplayMetrics().heightPixels / 3;
-                ViewGroup.LayoutParams lp = webView.getLayoutParams();
-                lp.height = maxH;
-                webView.setLayoutParams(lp);
-                webView.loadDataWithBaseURL(null, releaseNotes, "text/html", "UTF-8", null);
-            }
+            tvReleaseNotes.setVisibility(View.GONE);
+            webView.setVisibility(View.VISIBLE);
+            webView.getSettings().setJavaScriptEnabled(false);
+            int maxH = context.getResources().getDisplayMetrics().heightPixels / 3;
+            ViewGroup.LayoutParams lp = webView.getLayoutParams();
+            lp.height = maxH;
+            webView.setLayoutParams(lp);
+            webView.loadDataWithBaseURL(null, releaseNotes, "text/html", "UTF-8", null);
         }
 
         return new AlertDialog.Builder(context)
                 .setTitle(R.string.updatelib_update_available_title)
-                .setView(dialogView)
+                .setView(root)
                 .setPositiveButton(R.string.updatelib_update_to_site, (d, w) -> {
                     d.dismiss();
                     try {
