@@ -14,10 +14,6 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
         }
         debug {
             isMinifyEnabled = false
@@ -43,9 +39,6 @@ android {
     }
 }
 
-// FileProvider 由宿主项目提供，compileOnly 不打包
 dependencies {
-
-    //compileOnly(libs.androidx.core)
     implementation(libs.androidx.core)
 }
