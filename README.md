@@ -38,7 +38,7 @@ dependencies {
 }
 ```
 
-**纯 Java 零依赖（推荐老项目 / 体积敏感）：**
+**纯 Java 版（推荐老项目 / 体积敏感）：**
 
 ```kotlin
 dependencies {
@@ -401,7 +401,7 @@ UpdateManager.removeDownloadListener(listener);
 
 **方式三：GitHub Releases**
 
-传入 owner 和 repo，模块自动读取最新 Release 的 `tag_name`（版本号）和 `body`（更新日志），点击按钮跳转到 Releases 页面。GitHub 的 `body` 字段通常是 Markdown，会按 HTML 渲染。
+传入 owner 和 repo，模块自动读取最新 Release，解析 `assets` 找到 APK 直链地址作为按钮跳转目标；版本号优先从 APK 文件名提取（如 `app-v1.2.3.apk` → `1.2.3`），回退到 `tag_name`。更新日志取自 `body` 字段（通常是 Markdown，按 HTML 渲染）。GitHub API 速率限制（429）时自动触发 JSON 兜底。
 
 ### 初始化
 
@@ -486,111 +486,65 @@ public class MyActivity extends Activity {
 
 ## 监听下载进度
 
-### Kotlin（Flow）
+### update-java（回调）
 
-通过 `DownloadController.flow`（`StateFlow`）实时监听下载状态：
+```java
+UpdateManager.DownloadListener listener = state -> {
+    switch (state.status) {
+        case DOWNLOADING: progressBar.setProgress(state.progress); break;
+        case FAILED: /* 下载失败 */ break;
+        case IDLE: /* 下载完成或空闲 */ break;
+    }
+};
+UpdateManager.addDownloadListener(listener);
+// Activity 销毁时移除
+UpdateManager.removeDownloadListener(listener);
+```
+
+### update-lib（Kotlin Flow）
 
 ```kotlin
 lifecycleScope.launch {
     DownloadController.flow.collect { state ->
         when (state.status) {
-            DownloadController.DownloadStatus.DOWNLOADING -> {
-                // state.progress: 0-100
-                progressBar.progress = state.progress
-            }
-            DownloadController.DownloadStatus.FAILED -> {
-                // 下载失败
-            }
-            DownloadController.DownloadStatus.IDLE -> {
-                // 空闲（下载完成或尚未开始）
-            }
+            DownloadController.DownloadStatus.DOWNLOADING -> progressBar.progress = state.progress
+            DownloadController.DownloadStatus.FAILED -> { /* 下载失败 */ }
+            DownloadController.DownloadStatus.IDLE -> { /* 空闲 */ }
         }
     }
 }
 ```
 
-### Java（回调）
-
-使用 `observeDownloadState` 回调式 API，无需协程：
+### update-lib（Java 回调）
 
 ```java
 Job downloadJob = UpdateManager.observeDownloadState(state -> {
     switch (state.getStatus()) {
-        case DOWNLOADING:
-            progressBar.setProgress(state.getProgress());
-            break;
-        case FAILED:
-            // 下载失败
-            break;
-        case IDLE:
-            // 空闲
-            break;
+        case DOWNLOADING: progressBar.setProgress(state.getProgress()); break;
+        case FAILED: break;
+        case IDLE: break;
     }
 });
-
-// Activity 销毁时取消观察
-downloadJob.cancel();
+downloadJob.cancel(); // 销毁时取消
 ```
 
 ---
 
 ## Java 项目接入
 
-纯 Java 项目只需依赖 `update-lib`，使用回调式 API 即可，无需协程。
+纯 Java 项目推荐使用 `update-java` 模块（4 个源文件，< 25KB），仅依赖 `androidx.core`。详见上方 [update-java 用法](#update-java-用法纯-java--极简架构) 章节。
 
-### 初始化
+如果项目已引入 Kotlin，也可以用 `update-lib` 的 Java 兼容层：
 
 ```java
 // Application.onCreate()
 UpdateManager.init(this, "your-github-owner", "your-github-repo");
 
-// 或仅使用备用源
-UpdateManager.init(this, "", "",  "", "", true, 0L,
-    "https://example.com/update.json", true);
-```
-
-### 检查更新
-
-推荐使用 `checkAndShowUpdateDialog`，一行代码搞定：
-
-```java
-// 自动检查 + 弹窗 + 下载 + 安装
+// 一键检查 + 弹窗 + 下载 + 安装
 UpdateDialogHelper.checkAndShowUpdateDialog(this, null);
 ```
 
-如需手动控制，可调用 `checkForUpdate` 获取结果后自行处理：
-
-```java
-UpdateManager.checkForUpdate(true, result -> {
-    if (result instanceof UpdateRepository.CheckResult.NewVersion) {
-        UpdateState state = ((UpdateRepository.CheckResult.NewVersion) result).getState();
-        // 使用统一弹窗（含内联进度条）
-        UpdateDialogHelper.showUpdateDialog(this,
-            state.getLatestVersion(), state.getNotes(),
-            state.getApkUrl(), state.getApkSize(),
-            () -> { UpdateManager.downloadUpdate(this, state.getLatestVersion(), state.getApkUrl(), state.getApkSize()); return kotlin.Unit.INSTANCE; },
-            () -> kotlin.Unit.INSTANCE, // onIgnore
-            () -> kotlin.Unit.INSTANCE, // onDismiss
-            null // onInstall
-        );
-    } else if (result instanceof UpdateRepository.CheckResult.UpToDate) {
-        UpdateDialogHelper.showAlreadyLatestDialog(this);
-    }
-    return kotlin.Unit.INSTANCE;
-});
-```
-
-### 观察下载进度
-
-```java
-Job downloadJob = UpdateManager.observeDownloadState(state -> {
-    if (state.getStatus() == DownloadController.DownloadStatus.DOWNLOADING) {
-        progressBar.setProgress(state.getProgress());
-    }
-});
-```
-
-> **注意**：`CheckResult` 是 Kotlin sealed interface，Java 17+ 可用 `instanceof` 模式匹配。低版本 Java 需用 `if (result instanceof UpdateRepository.CheckResult.NewVersion)` 判断。所有 `UpdateManager` 和 `UpdateDialogHelper` 方法均有 `@JvmStatic`，Java 直接 `UpdateManager.xxx()` 调用即可。
+> **注意**：`update-lib` 的 `CheckResult` 是 Kotlin sealed interface，Java 17+ 可用 `instanceof` 模式匹配。低版本 Java 需用 `if (result instanceof UpdateRepository.CheckResult.NewVersion)` 判断。所有 `UpdateManager` 和 `UpdateDialogHelper` 方法均有 `@JvmStatic`，Java 直接 `UpdateManager.xxx()` 调用即可。
 
 ---
 
@@ -665,6 +619,8 @@ Job downloadJob = UpdateManager.observeDownloadState(state -> {
 | `RateLimited(resetEpochSeconds)` | GitHub API 限流，`resetEpochSeconds` 为解除时间 |
 | `NoApk(version)` | 有新版本但 Release 中尚未上传 APK |
 | `Skipped` | 检查间隔未到，使用了缓存结果 |
+
+> `update-java` 中对应为 `UpdateCore.CheckResult`，使用 enum `Type` 而非 sealed interface，Java 友好。
 
 ---
 

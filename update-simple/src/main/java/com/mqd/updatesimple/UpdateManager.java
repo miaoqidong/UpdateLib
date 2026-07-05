@@ -29,10 +29,11 @@ import java.net.URL;
  *
  * 支持三种模式：
  * 1. 自定义 JSON：{"versionName":"1.2.0","desUrl":"https://...","des":"更新内容（可选）"}
- * 2. GitHub Releases：传入 owner/repo，自动读取最新 Release 的 tag_name
- * 3. GitHub 优先 + JSON 兜底：GitHub 获取失败时自动降级到自定义 JSON
+ * 2. GitHub Releases：传入 owner/repo，自动读取最新 Release，解析 assets 找到 APK 直链；
+ *    版本号优先从 APK 文件名提取，回退到 tag_name
+ * 3. GitHub 优先 + JSON 兜底：GitHub 获取失败（含速率限制）时自动降级到自定义 JSON
  *
- * 更新日志自动识别 HTML 与纯文本，分别用 WebView 和 TextView 渲染。
+ * 更新日志自动识别 HTML 与纯文本，用 TextView 渲染。
  */
 public class UpdateManager {
 
@@ -93,6 +94,18 @@ public class UpdateManager {
         } catch (Exception e) { curVer = "0"; }
     }
 
+    /** 从 APK 文件名中提取版本号，如 "app-v1.2.3.apk" → "1.2.3"。失败返回 null。 */
+    private static String extractVersionFromFileName(String fileName) {
+        if (fileName == null) return null;
+        String nameWithoutExt;
+        int dotIdx = fileName.lastIndexOf('.');
+        if (dotIdx > 0) nameWithoutExt = fileName.substring(0, dotIdx);
+        else nameWithoutExt = fileName;
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(\\d+(?:\\.\\d+){1,3})");
+        java.util.regex.Matcher matcher = pattern.matcher(nameWithoutExt);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
     /** 检查更新，发现新版本则弹窗提示。需在主线程调用。 */
     public static void check(Activity act) {
         new Thread(() -> {
@@ -124,7 +137,8 @@ public class UpdateManager {
                 c.setRequestProperty("Accept", "application/vnd.github+json");
                 c.setRequestProperty("User-Agent", "updatesimple (Android)");
             }
-            if (c.getResponseCode() == HttpURLConnection.HTTP_OK) {
+            int code = c.getResponseCode();
+            if (code == HttpURLConnection.HTTP_OK) {
                 BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream()));
                 StringBuilder sb = new StringBuilder(); String l;
                 while ((l = r.readLine()) != null) sb.append(l);
@@ -132,8 +146,27 @@ public class UpdateManager {
                 JSONObject o = new JSONObject(sb.toString());
                 String remote, targetUrl, notes;
                 if (github) {
-                    remote = o.optString("tag_name", "");
-                    targetUrl = o.optString("html_url", releasesUrl);
+                    // 解析 assets 数组，找到第一个 .apk 文件的直链地址
+                    org.json.JSONArray assetsArr = o.optJSONArray("assets");
+                    String apkUrl = null;
+                    String apkFileName = null;
+                    if (assetsArr != null) {
+                        for (int i = 0; i < assetsArr.length(); i++) {
+                            org.json.JSONObject a = assetsArr.getJSONObject(i);
+                            String name = a.optString("name", "");
+                            if (name.toLowerCase().endsWith(".apk")) {
+                                apkUrl = a.optString("browser_download_url", null);
+                                apkFileName = name;
+                                break;
+                            }
+                        }
+                    }
+                    // 版本号：优先从 APK 文件名提取，回退到 tag_name
+                    String extractedVer = extractVersionFromFileName(apkFileName);
+                    remote = (extractedVer != null) ? extractedVer : o.optString("tag_name", "");
+                    // 跳转地址：优先 APK 直链，回退到 Releases 页面
+                    targetUrl = (apkUrl != null && !apkUrl.isEmpty())
+                            ? apkUrl : o.optString("html_url", releasesUrl);
                     notes = o.optString("body", "");
                 } else {
                     remote = o.optString("versionName", "");
@@ -142,6 +175,15 @@ public class UpdateManager {
                 }
                 return new String[]{remote, targetUrl, notes};
             }
+            // GitHub API 速率限制：429 或 X-RateLimit-Remaining=0 的 403
+            if (github && (code == 429 || code == 403)) {
+                String remaining = c.getHeaderField("X-RateLimit-Remaining");
+                if (code == 429 || "0".equals(remaining)) {
+                    c.disconnect();
+                    return null; // 触发 fallback
+                }
+            }
+            c.disconnect();
         } catch (Exception ignored) {}
         return null;
     }
