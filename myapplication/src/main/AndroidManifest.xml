@@ -21,25 +21,25 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".SampleViewActivity"
+            android:name=".LibKotlin_ViewActivity"
             android:exported="true"
             android:label="更新示例(View)"
             android:theme="@style/Theme.SideGesture.View">
         </activity>
         <activity
-            android:name=".SampleJavaActivity"
+            android:name=".LibJava_ViewActivity"
             android:exported="true"
             android:label="更新示例(Java)"
             android:theme="@style/Theme.SideGesture.View">
         </activity>
         <activity
-            android:name=".SampleUpdateJavaActivity"
+            android:name=".Java_ViewActivity"
             android:exported="true"
             android:label="更新示例(update-java)"
             android:theme="@style/Theme.SideGesture.View">
         </activity>
         <activity
-            android:name=".SampleUpdateSimpleActivity"
+            android:name=".Simple_ViewActivity"
             android:exported="true"
             android:label="更新示例(update-simple)"
             android:theme="@style/Theme.SideGesture.View">

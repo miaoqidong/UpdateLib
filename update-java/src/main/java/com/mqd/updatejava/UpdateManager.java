@@ -52,12 +52,10 @@ public class UpdateManager {
 
     public static void init(Context context,
                              String githubOwner, String githubRepo,
-                             String currentVersion,
-                             String fileProviderAuthority,
                              boolean compareByTag,
-                             long currentVersionCode,
                              String fallbackUrl,
-                             boolean fallbackOnly) {
+                             boolean fallbackOnly,
+                             String fileProviderAuthority) {
         appContext = context.getApplicationContext();
         UpdateManager.fileProviderAuthority = fileProviderAuthority;
 
@@ -72,11 +70,9 @@ public class UpdateManager {
             } else {
                 pkgInfo = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
             }
-            String detectedVersion = (currentVersion != null && !currentVersion.isEmpty())
-                    ? currentVersion : (pkgInfo.versionName != null ? pkgInfo.versionName : "");
-            long detectedVersionCode = currentVersionCode > 0 ? currentVersionCode :
-                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ?
-                            pkgInfo.getLongVersionCode() : pkgInfo.versionCode);
+            String detectedVersion = pkgInfo.versionName != null ? pkgInfo.versionName : "";
+            long detectedVersionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ?
+                    pkgInfo.getLongVersionCode() : pkgInfo.versionCode;
 
             UpdateManager.currentVersion = detectedVersion;
 
@@ -97,12 +93,11 @@ public class UpdateManager {
     }
 
     public static void init(Context context, String githubOwner, String githubRepo) {
-        init(context, githubOwner, githubRepo, "", "", true, 0L, "", false);
+        init(context, githubOwner, githubRepo, true, "", false, "");
     }
 
     public static void init(Context context, String fallbackUrl, boolean fallbackOnly) {
-        init(context, "", "", "", "", true, 0L,
-                fallbackUrl != null ? fallbackUrl : "", fallbackOnly);
+        init(context, "", "", true, fallbackUrl != null ? fallbackUrl : "", fallbackOnly, "");
     }
 
     public static Context getContext() {

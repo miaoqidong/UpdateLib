@@ -12,7 +12,7 @@ import com.mqd.updatelib.ui.UpdateDialogHelper
  * 演示如何用传统 View 体系以最少代码接入 update-lib。
  * 使用时复制此文件即可，不需要 update-compose 模块。
  */
-class SampleViewActivity : ComponentActivity() {
+class LibKotlin_ViewActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,7 +29,7 @@ class SampleViewActivity : ComponentActivity() {
             }
             stateListAnimator = null
             setOnClickListener {
-                UpdateDialogHelper.checkAndShowUpdateDialog(this@SampleViewActivity)
+                UpdateDialogHelper.checkAndShowUpdateDialog(this@LibKotlin_ViewActivity)
             }
         }
 

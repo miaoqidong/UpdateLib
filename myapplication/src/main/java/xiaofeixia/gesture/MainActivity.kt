@@ -102,25 +102,25 @@ private fun MainScreen(updateVm: UpdateViewModel) {
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {
-            context.startActivity(Intent(context, SampleViewActivity::class.java))
+            context.startActivity(Intent(context, LibKotlin_ViewActivity::class.java))
         }) {
             Text(text = "传统 View 示例 (update-lib库-Kotlin写法)")
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {
-            context.startActivity(Intent(context, SampleJavaActivity::class.java))
+            context.startActivity(Intent(context, LibJava_ViewActivity::class.java))
         }) {
             Text(text = "传统 View 示例 (update-lib库-Java写法)")
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {
-            context.startActivity(Intent(context, SampleUpdateJavaActivity::class.java))
+            context.startActivity(Intent(context, Java_ViewActivity::class.java))
         }) {
             Text(text = "传统 View 示例 (update-java库)")
         }
         Spacer(modifier = Modifier.height(12.dp))
         Button(onClick = {
-            context.startActivity(Intent(context, SampleUpdateSimpleActivity::class.java))
+            context.startActivity(Intent(context, Simple_ViewActivity::class.java))
         }) {
             Text(text = "传统 View 示例 (update-simple库)")
         }

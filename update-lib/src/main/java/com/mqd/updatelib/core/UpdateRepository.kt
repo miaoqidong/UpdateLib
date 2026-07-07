@@ -115,7 +115,12 @@ object UpdateRepository {
             extracted ?: release.tagName
         }
         Log.d("UpdateRepository", "compareByTag=${UpdateChecker.compareByTag}, compareVersion=$compareVersion, currentVersion=$currentVersion")       
-        val isNewer = UpdateChecker.isRemoteNewer(compareVersion, currentVersion)
+        var isNewer = UpdateChecker.isRemoteNewer(compareVersion, currentVersion)
+        // versionName 相同时，比较 APK 文件名中的 versionCode（如 "138-v2.9.0.apk" → 138）
+        if (!isNewer && compareVersion == currentVersion) {
+            val remoteCode = asset?.let { UpdateChecker.extractVersionCodeFromFileName(it.name) } ?: 0L
+            isNewer = remoteCode > 0 && remoteCode > UpdateChecker.currentVersionCode
+        }
         val hasApk = asset != null && asset.size > 0
 
         // 有新版但暂无可下载 APK：不写成功缓存，也不返回 NewVersion

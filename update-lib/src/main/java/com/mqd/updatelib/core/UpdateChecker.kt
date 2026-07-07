@@ -128,6 +128,12 @@ object UpdateChecker {
         return match?.groupValues?.get(1)
     }
 
+    /** 从 APK 文件名中提取 versionCode。支持 "138-v2.9.0.apk" 或 "138_v2.9.0.apk" 格式。 */
+    fun extractVersionCodeFromFileName(fileName: String): Long {
+        val match = Regex("""^(\d+)[-_]""").find(fileName)
+        return match?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+    }
+
     fun pickApkAsset(release: GithubRelease): GithubRelease.Asset? {
         return release.assets.firstOrNull { it.name.endsWith(".apk", ignoreCase = true) }
     }

@@ -50,12 +50,10 @@ object UpdateManager {
      * @param context 应用上下文
      * @param githubOwner GitHub 仓库所有者，仅备用源模式可省略
      * @param githubRepo GitHub 仓库名称，仅备用源模式可省略
-     * @param currentVersion 当前应用版本号，默认自动从 PackageInfo 读取
-     * @param fileProviderAuthority FileProvider authority，默认为 "${packageName}.updatelib.fileprovider"
      * @param compareByTag 版本比较模式：true（默认）比较 GitHub tag name，false 比较 APK 文件名中的版本号
-     * @param currentVersionCode 当前应用 versionCode，默认自动从 PackageInfo 读取
      * @param fallbackUrl 备用更新源 JSON 地址，传空串则禁用备用通道
      * @param fallbackOnly true 表示仅使用备用源（跳过 GitHub），false（默认）表示优先 GitHub
+     * @param fileProviderAuthority FileProvider authority，默认为 "${packageName}.updatelib.fileprovider"
      */
     @JvmStatic
     @JvmOverloads
@@ -63,12 +61,10 @@ object UpdateManager {
         context: Context,
         githubOwner: String = "",
         githubRepo: String = "",
-        currentVersion: String = "",
-        fileProviderAuthority: String = "${context.packageName}.updatelib.fileprovider",
         compareByTag: Boolean = true,
-        currentVersionCode: Long = 0L,
         fallbackUrl: String = "",
-        fallbackOnly: Boolean = false
+        fallbackOnly: Boolean = false,
+        fileProviderAuthority: String = "${context.packageName}.updatelib.fileprovider"
     ) {
         UpdateLibContext.init(context)
         this.githubOwner = githubOwner
@@ -88,9 +84,8 @@ object UpdateManager {
         } else {
             context.packageManager.getPackageInfo(context.packageName, 0)
         }
-        val detectedVersion = currentVersion.ifBlank { pkgInfo.versionName ?: "" }
-        val detectedVersionCode = if (currentVersionCode > 0) currentVersionCode
-            else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pkgInfo.longVersionCode
+        val detectedVersion = pkgInfo.versionName ?: ""
+        val detectedVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) pkgInfo.longVersionCode
             else @Suppress("DEPRECATION") pkgInfo.versionCode.toLong()
 
         this.currentVersion = detectedVersion

@@ -92,9 +92,14 @@ object FallbackChecker {
     }
 
     /**
-     * 判断字符串是否包含 HTML 标签。
+     * 判断字符串是否包含 HTML 标签（与 update-simple / update-java 一致）。
      */
     fun isHtmlContent(content: String): Boolean {
-        return content.trimStart().let { it.startsWith("<") || it.contains("<html") || it.contains("<div") || it.contains("<p>") || it.contains("<br") }
+        val s = content.trim().lowercase()
+        return s.contains("<p") || s.contains("<br") || s.contains("<div")
+                || s.contains("<ul") || s.contains("<ol") || s.contains("<li")
+                || s.contains("<h") || s.contains("<a ") || s.contains("<img")
+                || s.contains("<table") || s.contains("<html") || s.contains("<body")
+                || s.startsWith("<")
     }
 }

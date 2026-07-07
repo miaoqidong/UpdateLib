@@ -6,16 +6,16 @@ import android.widget.Button;
 
 import androidx.activity.ComponentActivity;
 
-import com.mqd.updatejava.UpdateManager;
-import com.mqd.updatejava.ui.UpdateDialogHelper;
+import com.mqd.updatelib.ui.UpdateDialogHelper;
 
 /**
- * update-java（纯 Java 零依赖）接入示例。
+ * Java 项目接入示例。
  * <p>
- * 演示如何用 update-java 模块接入，该模块不引入任何额外依赖（无 Kotlin、无协程、无 DataStore）。
- * 使用时复制此文件即可。
+ * 演示如何用纯 Java + 传统 View 体系以最少代码接入 update-lib。
+ * 不需要 Kotlin 协程，全部使用回调式 API。
+ * 使用时复制此文件即可，不需要 update-compose 模块。
  */
-public class SampleUpdateJavaActivity extends ComponentActivity {
+public class LibJava_ViewActivity extends ComponentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,7 +26,7 @@ public class SampleUpdateJavaActivity extends ComponentActivity {
         int vPad = (int) (12 * density);
 
         Button btnCheckUpdate = new Button(this);
-        btnCheckUpdate.setText("检查更新 (update-java)");
+        btnCheckUpdate.setText("检查更新 (Java)");
         btnCheckUpdate.setTextColor(0xFFFFFFFF);
         btnCheckUpdate.setPadding(hPad, vPad, hPad, vPad);
 
@@ -50,7 +50,7 @@ public class SampleUpdateJavaActivity extends ComponentActivity {
         root.addView(btnCheckUpdate, params);
         setContentView(root);
 
-        // 进入页面自动检查更新
+        // 进入页面自动检查更新（与 Compose 版行为一致）
         UpdateDialogHelper.checkAndShowUpdateDialog(this, null);
     }
 }

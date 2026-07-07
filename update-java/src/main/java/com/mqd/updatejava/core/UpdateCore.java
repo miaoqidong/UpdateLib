@@ -210,6 +210,18 @@ public class UpdateCore {
         return matcher.find() ? matcher.group(1) : null;
     }
 
+    /** 从 APK 文件名中提取 versionCode。支持 "138-v2.9.0.apk" 或 "138_v2.9.0.apk" 格式。 */
+    public static long extractVersionCodeFromFileName(String fileName) {
+        if (fileName == null) return 0L;
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^(\\d+)[-_]");
+        java.util.regex.Matcher matcher = pattern.matcher(fileName);
+        if (matcher.find()) {
+            try { return Long.parseLong(matcher.group(1)); }
+            catch (NumberFormatException e) { return 0L; }
+        }
+        return 0L;
+    }
+
     public static GithubRelease.Asset pickApkAsset(GithubRelease release) {
         if (release == null || release.assets == null) return null;
         for (GithubRelease.Asset asset : release.assets) {
@@ -369,12 +381,15 @@ public class UpdateCore {
         return false;
     }
 
+    /** 判断内容是否为 HTML（与 update-simple / update-lib 一致）。 */
     public static boolean isHtmlContent(String content) {
         if (content == null) return false;
-        String trimmed = content.trim();
-        return trimmed.startsWith("<") || trimmed.contains("<html")
-                || trimmed.contains("<div") || trimmed.contains("<p>")
-                || trimmed.contains("<br");
+        String s = content.trim().toLowerCase();
+        return s.contains("<p") || s.contains("<br") || s.contains("<div")
+                || s.contains("<ul") || s.contains("<ol") || s.contains("<li")
+                || s.contains("<h") || s.contains("<a ") || s.contains("<img")
+                || s.contains("<table") || s.contains("<html") || s.contains("<body")
+                || s.startsWith("<");
     }
 
     // ════════════════════ 状态持久化 ════════════════════
@@ -455,6 +470,11 @@ public class UpdateCore {
         }
 
         boolean isNewer = isRemoteNewer(compareVersion, currentVersion);
+        // versionName 相同时，比较 APK 文件名中的 versionCode（如 "138-v2.9.0.apk" → 138）
+        if (!isNewer && compareVersion.equals(currentVersion)) {
+            long remoteCode = asset != null ? extractVersionCodeFromFileName(asset.name) : 0L;
+            isNewer = remoteCode > 0 && remoteCode > currentVersionCode;
+        }
         boolean hasApk = asset != null && asset.size > 0;
 
         if (isNewer && !hasApk) {

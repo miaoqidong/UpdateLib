@@ -24,6 +24,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * View-based 更新对话框辅助类。
@@ -84,7 +89,15 @@ object UpdateDialogHelper {
             tvReleaseNotes.visibility = View.VISIBLE
             webView.visibility = View.GONE
             tvReleaseNotes.movementMethod = ScrollingMovementMethod.getInstance()
-            tvReleaseNotes.text = releaseNotes
+            if (isPlainUrl(releaseNotes)) {
+                tvReleaseNotes.movementMethod = android.text.method.LinkMovementMethod.getInstance()
+                tvReleaseNotes.text = android.text.Html.fromHtml(
+                    "<a href=\"$releaseNotes\">$releaseNotes</a>",
+                    android.text.Html.FROM_HTML_MODE_LEGACY
+                )
+            } else {
+                tvReleaseNotes.text = releaseNotes
+            }
         } else {
             // HTML 内容：用 WebView 渲染
             tvReleaseNotes.visibility = View.GONE
@@ -360,7 +373,15 @@ object UpdateDialogHelper {
             tvReleaseNotes.visibility = View.VISIBLE
             webView.visibility = View.GONE
             tvReleaseNotes.movementMethod = ScrollingMovementMethod.getInstance()
-            tvReleaseNotes.text = releaseNotes
+            if (isPlainUrl(releaseNotes)) {
+                tvReleaseNotes.movementMethod = android.text.method.LinkMovementMethod.getInstance()
+                tvReleaseNotes.text = android.text.Html.fromHtml(
+                    "<a href=\"$releaseNotes\">$releaseNotes</a>",
+                    android.text.Html.FROM_HTML_MODE_LEGACY
+                )
+            } else {
+                tvReleaseNotes.text = releaseNotes
+            }
         } else {
             tvReleaseNotes.visibility = View.GONE
             webView.visibility = View.VISIBLE
@@ -501,6 +522,30 @@ object UpdateDialogHelper {
         }
     }
 
+    /** 判断内容是否为纯 URL（http/https 开头且不含空格/换行）。 */
+    private fun isPlainUrl(content: String?): Boolean {
+        if (content.isNullOrBlank()) return false
+        val s = content.trim()
+        return (s.startsWith("http://") || s.startsWith("https://"))
+                && !s.contains(" ") && !s.contains("\n")
+    }
+
+    /** 获取 URL 指向的页面内容（纯文本或 HTML），失败返回 null。 */
+    private suspend fun fetchUrlContent(url: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val conn = URL(url).openConnection() as HttpURLConnection
+            conn.connectTimeout = 5000
+            conn.readTimeout = 8000
+            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                val body = conn.inputStream.bufferedReader().use { it.readText() }
+                conn.disconnect()
+                return@withContext body
+            }
+            conn.disconnect()
+        } catch (_: Exception) {}
+        null
+    }
+
     /**
      * 一键检查更新并自动展示对应对话框。
      *
@@ -534,7 +579,20 @@ object UpdateDialogHelper {
         UpdateManager.checkForUpdate(true) { result ->
             when (result) {
                 is UpdateRepository.CheckResult.NewVersion -> {
-                    showNewVersionDialog(activity, result.state, onDismiss)
+                    val notes = result.state.notes
+                    if (isPlainUrl(notes)) {
+                        CoroutineScope(Dispatchers.Main).launch {
+                            val fetched = fetchUrlContent(notes)
+                            val state = if (!fetched.isNullOrBlank()) {
+                                result.state.copy(notes = fetched)
+                            } else {
+                                result.state
+                            }
+                            showNewVersionDialog(activity, state, onDismiss)
+                        }
+                    } else {
+                        showNewVersionDialog(activity, result.state, onDismiss)
+                    }
                 }
                 is UpdateRepository.CheckResult.UpToDate -> {
                     showAlreadyLatestDialog(activity)

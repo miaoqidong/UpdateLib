@@ -268,6 +268,11 @@ UpdateDialogHelper.showUpdateDialog(
 
 所有弹窗标题栏右上角都带有详情跳转按钮，点击会打开 `getReleasesPageUrl()` 返回的链接（优先使用备用源 `desUrl`，回退到 GitHub Releases 页面）。
 
+更新日志渲染会自动识别内容类型：
+- HTML 内容 → WebView 渲染
+- 纯 URL（`http://` 或 `https://` 开头）→ 后台自动获取 URL 页面内容后渲染，获取失败则显示为可点击链接
+- 纯文本 → TextView
+
 ---
 
 ## update-java 用法（纯 Java · 极简架构）
@@ -390,18 +395,19 @@ UpdateManager.removeDownloadListener(listener);
 自行托管一个 JSON 文件，格式如下：
 
 ```json
-{"versionName":"1.2.0","desUrl":"https://example.com/download","des":"- 修复了若干问题<br>- 新增 XX 功能"}
+{"versionName":"1.2.0","versionCode":123,"desUrl":"https://example.com/download","des":"- 修复了若干问题<br>- 新增 XX 功能"}
 ```
 
 | 字段 | 说明 |
 |---|---|
 | `versionName` | 最新版本号，如 `"1.2.0"` |
+| `versionCode` | 最新 versionCode（可选），用于 versionName 相同时的辅助比较 |
 | `desUrl` | 下载页面地址，用户点击按钮后跳转 |
-| `des` | 更新日志（可选），支持纯文本和 HTML，如包含 HTML 标签则自动用 `Html.fromHtml()` 渲染 |
+| `des` | 更新日志（可选），支持纯文本、纯 URL 和 HTML |
 
 **方式三：GitHub Releases**
 
-传入 owner 和 repo，模块自动读取最新 Release，解析 `assets` 找到 APK 直链地址作为按钮跳转目标；版本号优先从 APK 文件名提取（如 `app-v1.2.3.apk` → `1.2.3`），回退到 `tag_name`。更新日志取自 `body` 字段（通常是 Markdown，按 HTML 渲染）。GitHub API 速率限制（429）时自动触发 JSON 兜底。
+传入 owner 和 repo，模块自动读取最新 Release，解析 `assets` 找到 APK 直链地址作为按钮跳转目标。版本号来源由 `compareByTag` 控制：`true`（默认）用 `tag_name`，`false` 从 APK 文件名提取（如 `app-v1.2.3.apk` → `1.2.3`）。更新日志取自 `body` 字段（通常是 Markdown，按 HTML 渲染）。GitHub API 速率限制（429）时自动触发 JSON 兜底。
 
 ### 初始化
 
@@ -413,14 +419,20 @@ public class App extends Application {
     public void onCreate() {
         super.onCreate();
 
-        // 方式一：GitHub 优先 + JSON 兜底（推荐）
-        UpdateHelper.init(this, "owner", "repo", "https://example.com/fallback.json");
+        // 方式一：GitHub 优先 + JSON 兜底（推荐，默认 compareByTag=true）
+        UpdateManager.init(this, "owner", "repo", "https://example.com/fallback.json");
 
-        // 方式二：自定义 JSON
-        // UpdateHelper.init(this, "https://example.com/update.json");
+        // 方式一（全参数）：自定义版本比较策略和更新源模式
+        // UpdateManager.init(this, "owner", "repo",         // GitHub 仓库
+        //         false,                                    // compareByTag: false=从 APK 文件名提取版本号
+        //         "https://example.com/fallback.json",      // fallbackUrl
+        //         false);                                   // fallbackOnly=true 则完全跳过 GitHub
+
+        // 方式二：自定义 JSON（仅备用源）
+        // UpdateManager.init(this, "https://example.com/update.json");
 
         // 方式三：纯 GitHub Releases
-        // UpdateHelper.init(this, "owner", "repo");
+        // UpdateManager.init(this, "owner", "repo");
     }
 }
 ```
@@ -437,11 +449,11 @@ public class MyActivity extends Activity {
         setContentView(R.layout.activity_main);
 
         // 进入页面自动检查
-        UpdateHelper.check(this);
+        UpdateManager.check(this);
 
         // 按钮手动触发
         findViewById(R.id.btnCheckUpdate).setOnClickListener(v ->
-            UpdateHelper.check(this)
+            UpdateManager.check(this)
         );
     }
 }
@@ -456,15 +468,17 @@ public class MyActivity extends Activity {
 - 更新日志区域：
   - 纯文本：14sp 可滚动 TextView（maxLines=10）
   - HTML：`Html.fromHtml()` 渲染，`LinkMovementMethod` 支持超链接点击
+  - 纯 URL：后台获取 URL 内容后渲染，失败则显示为可点击链接
 
 ### API
 
 | 方法 | 说明 |
 |---|---|
-| `UpdateHelper.init(context, jsonUrl)` | 初始化（自定义 JSON 源，自动读取当前版本号） |
-| `UpdateHelper.init(context, owner, repo)` | 初始化（GitHub Releases 源，自动读取当前版本号） |
-| `UpdateHelper.init(context, owner, repo, fallbackUrl)` | 初始化（GitHub 优先 + JSON 兜底，自动读取当前版本号） |
-| `UpdateHelper.check(activity)` | 检查更新，有新版本则弹窗跳转 |
+| `UpdateManager.init(context, jsonUrl)` | 初始化（自定义 JSON 源，自动读取当前版本号和 versionCode） |
+| `UpdateManager.init(context, owner, repo)` | 初始化（GitHub Releases 源，自动读取当前版本号和 versionCode） |
+| `UpdateManager.init(context, owner, repo, fallbackUrl)` | 初始化（GitHub 优先 + JSON 兜底，自动读取当前版本号和 versionCode） |
+| `UpdateManager.init(context, owner, repo, compareByTag, fallbackUrl, fallbackOnly)` | 全参数初始化。`compareByTag` 默认 `true`（用 tag_name），`false` 从 APK 文件名提取版本号；`fallbackOnly` 为 `true` 完全跳过 GitHub。versionName 和 versionCode 自动从 PackageInfo 读取 |
+| `UpdateManager.check(activity)` | 检查更新，有新版本则弹窗跳转 |
 
 ### 与 update-java 的区别
 
@@ -477,7 +491,11 @@ public class MyActivity extends Activity {
 | 外部依赖 | androidx.core | **零** |
 | GitHub Releases | ✓ | ✓ |
 | 自定义 JSON | ✓ | ✓ |
+| fallbackOnly 模式 | ✓ | ✓ |
+| compareByTag 可配 | ✓ | ✓ |
+| versionCode 比较 | ✓ | ✓ |
 | HTML 更新日志 | Html.fromHtml | Html.fromHtml |
+| URL 内容自动获取 | ✓ | ✓ |
 | 下载/安装 | ✓ | — |
 | 通知 | 前台最小通知 | — |
 | 点击"更新" | 下载并安装 | 跳转网站 |

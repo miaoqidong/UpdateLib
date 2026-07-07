@@ -13,7 +13,7 @@ import com.mqd.updatesimple.UpdateManager;
 /**
  * update-simple 模块示例——纯检查更新 + 跳转网站。
  */
-public class SampleUpdateSimpleActivity extends ComponentActivity {
+public class Simple_ViewActivity extends ComponentActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
